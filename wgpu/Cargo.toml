@@ -1,0 +1,15 @@
+[package]
+name = "uial-wgpu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uial-core = { path = "../core" }
+env_logger = "0.9.0"
+pollster = "0.2.4"
+winit = "0.25.0"
+wgpu = "0.11.0"
+guillotiere = "0.6.2"
+image = "0.23.14"
+fortify = "0.2.0"
+bytemuck = { version = "1.7.2", features = ["derive"] }

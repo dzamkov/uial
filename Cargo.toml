@@ -1,0 +1,14 @@
+[package]
+name = "uial"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [
+	"core",
+	"wgpu"
+]
+
+[dependencies]
+uial-core = { path = "core" }
+uial-wgpu = { path = "wgpu" }
