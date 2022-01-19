@@ -105,6 +105,32 @@ impl<'brand> State for ClockState<'brand> {
     }
 
     fn get_derived<F: Fn(&Self) -> T, T: Clone>(&self, derived: &Self::Derived<F, T>) -> Cow<T> {
-        todo!()
+        // Check cache
+        if let Some((clock, value)) = unsafe { &*derived.cache.get() } {
+            if *clock == self.clock {
+                return Cow::Borrowed(value);
+            }
+        }
+
+        // Compute value and store in cache
+        let value = (derived.compute_fn)(self);
+        let cache = unsafe { (*derived.cache.get()).insert((self.clock, value)) };
+        Cow::Borrowed(&cache.1)
     }
+}
+
+#[test]
+fn test_clock_state() {
+    ClockState::new(|mut state| {
+        let a = state.new_cell(1);
+        let b = state.new_cell(2);
+        let c = state.new_derived(|state| state.get_cell(&a) + state.get_cell(&b));
+        assert_eq!(*state.get_cell(&a), 1);
+        assert_eq!(*state.get_cell(&b), 2);
+        assert_eq!(*state.get_derived(&c), 3);
+        assert_eq!(*state.get_derived(&c), 3);
+        *state.modify_cell(&a) = 3;
+        assert_eq!(*state.get_cell(&a), 3);
+        assert_eq!(*state.get_derived(&c), 5);
+    });
 }
