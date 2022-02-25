@@ -1,30 +1,32 @@
 use crate::*;
+use std::borrow::Cow;
 
-pub fn fill<S: State, D: Drawer>(color: Color) -> impl Widget<S, D> {
-    FillWidget(color)
+/// Constructs a [`Widget`] that displays as a single solid [`Paint`] and is not interactable.
+pub fn fill(paint: Paint) -> FillWidget {
+    FillWidget(paint)
 }
 
-struct FillWidget(Color);
+#[derive(fortify::Lower)]
+pub struct FillWidget(Paint);
 
 impl<S: State, D: Drawer> Widget<S, D> for FillWidget {
-    type Inst<Env: WidgetEnvironment<State = S, Drawer = D>> = SimpleWidgetInst<Self, Env>;
+    type Elem<'a, P: Placement<State = S>> = FillElement<P>;
 
-    fn size(&self) -> Option<Vector2<u32>> {
-        None
+    fn sizing(&self, _: &S) -> Cow<Sizing<i32>> {
+        Cow::Owned(Sizing::any())
     }
 
-    fn inst<Env: WidgetEnvironment<State = S, Drawer = D>>(self, env: Env) -> Self::Inst<Env> {
-        SimpleWidgetInst::new(self, env)
+    fn place<'a, P: Placement<State = S>>(&'a self, _: &mut S, placement: P) -> Self::Elem<'a, P> {
+        FillElement(self.0, placement)
     }
 }
 
-impl<S: State, D: Drawer> SimpleWidget<S, D> for FillWidget {
-    fn draw_to<Env: WidgetEnvironment<State = S, Drawer = D>>(
-        &self,
-        env: &Env,
-        s: &S,
-        drawer: &mut D,
-    ) {
-        drawer.fill_rect(Paint::from(self.0), env.location(s))
+pub struct FillElement<P: Placement>(Paint, P);
+
+impl<P: Placement, D: Drawer> Element<D> for FillElement<P> {
+    type State = P::State;
+
+    fn draw_to(&self, s: &Self::State, drawer: &mut D) {
+        drawer.fill_rect(self.0, self.1.rect(s))
     }
 }

@@ -1,12 +1,14 @@
+mod sizing;
 mod transform;
 
 pub use cgmath::vec2;
 pub use cgmath::{Matrix2, Vector2};
 pub use cgmath::ElementWise;
+pub use cgmath::BaseNum;
+pub use sizing::*;
 pub use transform::*;
 pub use GridDir2::{East, North, South, West};
 pub use GridRotation2::{Ccw, Cw, Flip};
-use cgmath::BaseNum;
 
 /// An axis-aligned box in two-dimensional space.
 #[derive(PartialEq, Eq, Copy, Clone, Hash)]

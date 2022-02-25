@@ -1,63 +1,64 @@
 mod fill;
+mod with_sizing;
 
 use crate::*;
 pub use fill::*;
+use fortify::{Fortify, Lower};
+use std::borrow::Cow;
+pub use with_sizing::*;
 
+/// A static description of a rectangular GUI element whose size and location has not yet been
+/// determined. A widget may have size constraints and preferences that affect how it is used in
+/// a layout.
 pub trait Widget<S: State, D: Drawer> {
-    type Inst<Env: WidgetEnvironment<State = S, Drawer = D>>: WidgetInstance<Env = Env>;
-    fn size(&self) -> Option<Vector2<u32>>;
-    fn inst<Env: WidgetEnvironment<State = S, Drawer = D>>(self, env: Env) -> Self::Inst<Env>;
+    /// The type of [`Element`] constructed by placing this [`Widget`].
+    type Elem<'a, P: Placement<State = S>>: Element<D, State = S>
+    where
+        Self: 'a;
+
+    /// Gets the sizing constraints and preferences for this [`Widget`] at the given state.
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>>;
+
+    /// Specifies a concrete size and location for this [`Widget`], yielding an [`Element`].
+    fn place<'a, P: Placement<State = S>>(&'a self, s: &mut S, placement: P) -> Self::Elem<'a, P>;
 }
 
-pub trait WidgetEnvironment {
+/// Specifies the size and location of a [`Widget`] and provides a means of interacting with other
+/// related UI elements.
+pub trait Placement {
+    /// The type of application state this [`Placement`] interacts with.
     type State: State;
 
-    type Drawer: Drawer;
-
-    /// Gets the current absolute location (position and size) of the widget.
-    fn location(&self, s: &Self::State) -> Box2<i32>;
+    /// Gets the current placement rectangle for this [`Placement`].
+    fn rect(&self, s: &Self::State) -> Box2<i32>;
 }
 
-pub trait WidgetInstance {
-    /// The type of [`WidgetEnvironment`] used to instantiate the widge.
-    type Env: WidgetEnvironment;
+/// A GUI element which occupies a specific area on a two-dimensional surface. The size and
+/// location of the element are determined upon creation, but can vary depending on the
+/// application [`State`].
+pub trait Element<D: Drawer> {
+    /// The type of application state this [`Element`] interacts with.
+    type State: State;
 
-    /// Draws the widget to the given [`Drawer`].
-    fn draw_to(
-        &self,
-        s: &<Self::Env as WidgetEnvironment>::State,
-        drawer: &mut <Self::Env as WidgetEnvironment>::Drawer,
-    );
+    /// Draws the element to `drawer`.
+    fn draw_to(&self, s: &Self::State, drawer: &mut D);
 }
 
-/// A [`WidgetInstance`] constructed directly from a [`SimpleWidget`] and a [`WidgetEnvironment`].
-pub struct SimpleWidgetInst<W, Env> {
-    source: W,
-    env: Env,
-}
-
-impl<Env: WidgetEnvironment, W: SimpleWidget<Env::State, Env::Drawer>> SimpleWidgetInst<W, Env> {
-    /// Constructs a [`SimpleWidgetInst`] from the given source widget and environment.
-    pub fn new(source: W, env: Env) -> Self {
-        Self { source, env }
-    }
-}
-
-pub trait SimpleWidget<S: State, D: Drawer>: Widget<S, D> {
-    /// Draws the widget to the given [`Drawer`].
-    fn draw_to<Env: WidgetEnvironment<State = S, Drawer = D>>(
-        &self,
-        env: &Env,
-        s: &S,
-        drawer: &mut D,
-    );
-}
-
-impl<Env: WidgetEnvironment, W: SimpleWidget<Env::State, Env::Drawer>> WidgetInstance
-    for SimpleWidgetInst<W, Env>
+impl<S: State, D: Drawer, T: Widget<S, D>> Widget<S, D> for Fortify<T>
+where
+    for<'a> T: Lower<'a>,
+    for<'a> <T as Lower<'a>>::Target: Widget<S, D>,
 {
-    type Env = Env;
-    fn draw_to(&self, s: &Env::State, drawer: &mut Env::Drawer) {
-        self.source.draw_to(&self.env, s, drawer)
+    type Elem<'a, P: Placement<State = S>>
+    where
+        Self: 'a,
+    = <<T as Lower<'a>>::Target as Widget<S, D>>::Elem<'a, P>;
+
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>> {
+        self.borrow().sizing(s)
+    }
+
+    fn place<'a, P: Placement<State = S>>(&'a self, s: &mut S, placement: P) -> Self::Elem<'a, P> {
+        self.borrow().place(s, placement)
     }
 }

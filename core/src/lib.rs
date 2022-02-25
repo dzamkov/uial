@@ -10,4 +10,5 @@ pub use geometry::*;
 pub use state::*;
 pub use drawer::*;
 pub use application::*;
-pub use widget::{Widget, WidgetEnvironment, WidgetInstance, SimpleWidget, SimpleWidgetInst};
+pub use widget::{Widget, Placement, Element};
+pub use widget::WithSizingWidgetExt;

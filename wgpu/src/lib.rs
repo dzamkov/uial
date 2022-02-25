@@ -52,6 +52,7 @@ pub fn wgpu_app(state: impl State + 'static) -> impl Application<'static> {
     surface.configure(&device, &config);
 
     // Return application
+    let size = state.new_cell(vec2(size.width as i32, size.height as i32));
     WgpuApp {
         state,
         window,
@@ -63,6 +64,7 @@ pub fn wgpu_app(state: impl State + 'static) -> impl Application<'static> {
             let queue = queue;
             let drawer = WgpuDrawerContext::new(&device, &queue);
             yield WgpuAppInner {
+                size: &size,
                 device: &device,
                 queue: &queue,
                 drawer: &drawer
@@ -72,18 +74,19 @@ pub fn wgpu_app(state: impl State + 'static) -> impl Application<'static> {
 }
 
 /// An interface for setting up and running an application on the WebGPU platform.
-struct WgpuApp<S: State> {
+struct WgpuApp<S: State + 'static> {
     state: S,
     window: winit::window::Window,
     event_loop: winit::event_loop::EventLoop<()>,
     surface: wgpu::Surface,
     config: wgpu::SurfaceConfiguration,
-    inner: Fortify<WgpuAppInner<'static>>,
+    inner: Fortify<WgpuAppInner<'static, S>>,
 }
 
 /// Encapsulates the borrowed resources for a [`WgpuApp`].
-#[derive(WithLifetime)]
-struct WgpuAppInner<'a> {
+#[derive(Lower)]
+struct WgpuAppInner<'a, S: State> {
+    size: &'a StateCell<S, Vector2<i32>>,
     device: &'a wgpu::Device,
     queue: &'a wgpu::Queue,
     drawer: &'a WgpuDrawerContext<'a>,
@@ -101,7 +104,11 @@ impl<S: State + 'static> Application<'static> for WgpuApp<S> {
         let window = self.window;
         let mut config = self.config;
         let surface = self.surface;
-        let inner = self.inner;
+        let runtime = fortify! {
+            let inner = self.inner.borrow();
+            let elem = widget.place(&mut self.state, inner);
+            yield (inner, elem);
+        };
         self.event_loop.run(move |event, _, control_flow| {
             *control_flow = winit::event_loop::ControlFlow::Wait;
             match event {
@@ -114,7 +121,7 @@ impl<S: State + 'static> Application<'static> for WgpuApp<S> {
                 } => {
                     config.width = size.width;
                     config.height = size.height;
-                    surface.configure(inner.borrow().device, &config);
+                    surface.configure(runtime.borrow().0.device, &config);
                 }
                 winit::event::Event::RedrawRequested(_) => {
                     let frame = surface
@@ -123,7 +130,7 @@ impl<S: State + 'static> Application<'static> for WgpuApp<S> {
                     let view = frame
                         .texture
                         .create_view(&wgpu::TextureViewDescriptor::default());
-                    let drawer = inner.borrow().drawer;
+                    let drawer = runtime.borrow().0.drawer;
                     drawer.with_drawer(&view, (config.width, config.height), |d| {
                         d.fill_rect(
                             Paint::new(255, 0, 0, 255),
@@ -139,5 +146,11 @@ impl<S: State + 'static> Application<'static> for WgpuApp<S> {
                 _ => {}
             }
         })
+    }
+}
+impl<'a, S: State> Placement for &'a WgpuAppInner<'a, S> {
+    type State = S;
+    fn rect(&self, s: &Self::State) -> Box2<i32> {
+        todo!()
     }
 }

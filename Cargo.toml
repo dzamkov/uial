@@ -12,3 +12,4 @@ members = [
 [dependencies]
 uial-core = { path = "core" }
 uial-wgpu = { path = "wgpu" }
+fortify = { git = "https://github.com/dzamkov/fortify", rev = "24aafea" }
