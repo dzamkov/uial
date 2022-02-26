@@ -10,5 +10,5 @@ pub use geometry::*;
 pub use state::*;
 pub use graphics::*;
 pub use application::*;
-pub use widget::{Widget, Placement, Element};
+pub use widget::{Widget, WidgetBase, Placement, Element};
 pub use widget::WithSizingWidgetExt;

@@ -10,17 +10,20 @@ pub use with_sizing::*;
 /// A static description of a rectangular GUI element whose size and location has not yet been
 /// determined. A widget may have size constraints and preferences that affect how it is used in
 /// a layout.
-pub trait Widget<S: State, G: Graphics> {
+pub trait Widget<S: State, G: Graphics>: WidgetBase<S> {
     /// The type of [`Element`] constructed by placing this [`Widget`].
     type Elem<'a, P: Placement<State = S>>: Element<G, State = S>
     where
         Self: 'a;
 
-    /// Gets the sizing constraints and preferences for this [`Widget`] at the given state.
-    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>>;
-
     /// Specifies a concrete size and location for this [`Widget`], yielding an [`Element`].
     fn place<'a, P: Placement<State = S>>(&'a self, s: &mut S, placement: P) -> Self::Elem<'a, P>;
+}
+
+/// The functionality of [`Widget`] that is independent of graphics context.
+pub trait WidgetBase<S: State> {
+    /// Gets the sizing constraints and preferences for this [`Widget`] at the given state.
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>>;
 }
 
 /// Specifies the size and location of a [`Widget`] and provides a means of interacting with other
@@ -55,6 +58,16 @@ unsafe impl<'a, 'b, S: State + 'b, G: Graphics + 'b> Lower<'b> for dyn Element<G
     }
 }
 
+impl<S: State, T: WidgetBase<S>> WidgetBase<S> for Fortify<T>
+where
+    for<'a> T: Lower<'a>,
+    for<'a> <T as Lower<'a>>::Target: WidgetBase<S>,
+{
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>> {
+        self.borrow().sizing(s)
+    }
+}
+
 impl<S: State, G: Graphics, T: Widget<S, G>> Widget<S, G> for Fortify<T>
 where
     for<'a> T: Lower<'a>,
@@ -64,10 +77,6 @@ where
     where
         Self: 'a,
     = <<T as Lower<'a>>::Target as Widget<S, G>>::Elem<'a, P>;
-
-    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>> {
-        self.borrow().sizing(s)
-    }
 
     fn place<'a, P: Placement<State = S>>(&'a self, s: &mut S, placement: P) -> Self::Elem<'a, P> {
         self.borrow().place(s, placement)

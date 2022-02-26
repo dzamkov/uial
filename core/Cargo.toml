@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-fortify = { git = "https://github.com/dzamkov/fortify", rev = "24aafea" }
+fortify = "0.3.1"
 cgmath = "0.18.0"
 image = "0.23.14"

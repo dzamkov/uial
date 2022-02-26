@@ -9,13 +9,14 @@ pub fn fill(paint: Paint) -> FillWidget {
 #[derive(fortify::Lower)]
 pub struct FillWidget(Paint);
 
-impl<S: State, G: Graphics> Widget<S, G> for FillWidget {
-    type Elem<'a, P: Placement<State = S>> = FillElement<P>;
-
+impl<S: State> WidgetBase<S> for FillWidget {
     fn sizing(&self, _: &S) -> Cow<Sizing<i32>> {
         Cow::Owned(Sizing::any())
     }
+}
 
+impl<S: State, G: Graphics> Widget<S, G> for FillWidget {
+    type Elem<'a, P: Placement<State = S>> = FillElement<P>;
     fn place<'a, P: Placement<State = S>>(&'a self, _: &mut S, placement: P) -> Self::Elem<'a, P> {
         FillElement(self.0, placement)
     }
