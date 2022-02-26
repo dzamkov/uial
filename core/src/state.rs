@@ -22,6 +22,11 @@ pub trait State {
     /// Modifies a cell's value for this state.
     fn modify_cell<'a, T: Clone>(&'a mut self, cell: &'a StateCell<Self, T>) -> &'a mut T;
 
+    /// Sets the the value of a cell for this state.
+    fn set_cell<T: Clone>(&mut self, cell: &StateCell<Self, T>, value: T) {
+        *self.modify_cell(cell) = value;
+    }
+
     /// Gets a cached value for this state.
     fn get_cache<'a, D: OwnDependent<Self>>(
         &'a self,

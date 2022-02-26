@@ -1,11 +1,24 @@
 use crate::*;
 
-/// An interface for precisely drawing on a discrete two-dimensional surface.
-pub trait Drawer {
-    /// The type of source image that can be drawn using this [`Drawer`].
+/// An interface for a graphics context.
+pub trait Graphics {
+    /// An image that can be loaded and drawn using this graphics context.
     type Image;
 
-    /// Loads an image for use with this [`Drawer`].
+    /// An interface for drawing to a two-dimensional surface using this graphics context.
+    type Drawer<'a>: Drawer<Image = Self::Image>;
+
+    /// Loads an image for use with the graphics context.
+    // TODO: Also accept references to image data.
+    fn load_image(&self, data: image::DynamicImage) -> Self::Image;
+}
+
+/// An interface for precisely drawing on a discrete two-dimensional surface.
+pub trait Drawer {
+    /// An image that can be loaded and drawn using this drawer.
+    type Image;
+
+    /// Loads an image for use with this drawer.
     // TODO: Also accept references to image data.
     fn load_image(&mut self, data: image::DynamicImage) -> Self::Image;
 
@@ -95,6 +108,15 @@ impl Paint {
 impl From<Color> for Paint {
     fn from(color: Color) -> Self {
         Paint::new(color.r(), color.g(), color.b(), 255)
+    }
+}
+
+impl<'a, T: Graphics + ?Sized> Graphics for &'a T {
+    type Image = T::Image;
+    type Drawer<'b> = T::Drawer<'b>;
+
+    fn load_image(&self, data: image::DynamicImage) -> Self::Image {
+        (*self).load_image(data)
     }
 }
 

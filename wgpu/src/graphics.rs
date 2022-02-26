@@ -7,18 +7,19 @@ use wgpu::util::*;
 pub static DRAW_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
 
 /// Encapsulates the resources needed to create and use a [`WgpuDrawer`].
-pub struct WgpuDrawerContext<'a> {
+#[derive(Lower)]
+pub struct WgpuGraphics<'a> {
     device: &'a wgpu::Device,
     queue: &'a wgpu::Queue,
+    image_atlas: &'a WgpuTextureAtlas<'a>,
     bind_group_layout_0: wgpu::BindGroupLayout,
     draw_image_pipeline: wgpu::RenderPipeline,
     draw_image_bind_group_layout_1: wgpu::BindGroupLayout,
-    image_atlas: WgpuTextureAtlas<'a>,
 }
 
-impl<'a> WgpuDrawerContext<'a> {
-    /// Creates a new [`WgpuDrawerContext`] for the given device and queue.
-    pub fn new(device: &'a wgpu::Device, queue: &'a wgpu::Queue) -> Self {
+impl<'a> WgpuGraphics<'a> {
+    /// Creates a new [`WgpuGraphics`] for the given device and queue.
+    pub fn new(device: &'a wgpu::Device, queue: &'a wgpu::Queue) -> Fortify<WgpuGraphics<'a>> {
         // Create uniforms bind group layout
         let bind_group_layout_0 =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -112,31 +113,28 @@ impl<'a> WgpuDrawerContext<'a> {
             multisample: wgpu::MultisampleState::default(),
         });
 
-        // Create texture atlas
-        let image_atlas = WgpuTextureAtlas::new(device, queue, 1024);
+        fortify! {
+            // Create texture atlas
+            let image_atlas = WgpuTextureAtlas::new(device, queue, 1024);
 
-        // Build context
-        WgpuDrawerContext {
-            device,
-            queue,
-            bind_group_layout_0,
-            draw_image_pipeline,
-            draw_image_bind_group_layout_1,
-            image_atlas,
+            // Build graphics context
+            yield WgpuGraphics {
+                device,
+                queue,
+                image_atlas: &image_atlas,
+                bind_group_layout_0,
+                draw_image_pipeline,
+                draw_image_bind_group_layout_1,
+            };
         }
     }
 
-    /// Loads an image for use with this context.
-    pub fn load_image<'b>(&'b self, source: image::DynamicImage) -> WgpuDrawerImage<'b> {
-        self.image_atlas.alloc(source)
-    }
-
     /// Draws onto the given [`wgpu::TextureView`] using a [`WgpuDrawer`].
-    pub fn with_drawer<'b>(
-        &'b self,
+    pub fn with_drawer(
+        &self,
         view: &wgpu::TextureView,
         size: (u32, u32),
-        draw: impl FnOnce(&mut WgpuDrawer<'b>),
+        draw: impl FnOnce(&mut WgpuDrawer<'a>),
     ) {
         // Create uniform buffer
         let scale_x = 2.0 / (size.0 as f32);
@@ -199,7 +197,7 @@ impl<'a> WgpuDrawerContext<'a> {
 
         // Build draw data
         let mut drawer = WgpuDrawer {
-            image_atlas: &self.image_atlas,
+            image_atlas: self.image_atlas,
             draw_image_verts: Vec::new(),
             draw_image_indices: Vec::new(),
         };
@@ -293,7 +291,7 @@ impl<'a> WgpuTextureAtlas<'a> {
     }
 
     /// Allocates and loads an image into this texture atlas.
-    pub fn alloc(&'a self, image: image::DynamicImage) -> WgpuDrawerImage<'a> {
+    pub fn alloc(&'a self, image: image::DynamicImage) -> WgpuImage<'a> {
         let size = guillotiere::size2(image.width() as i32, image.height() as i32);
         if let Some(alloc) = unsafe { (*self.allocator.as_ptr()).allocate(size) } {
             self.queue.write_texture(
@@ -319,10 +317,18 @@ impl<'a> WgpuTextureAtlas<'a> {
                     depth_or_array_layers: 1,
                 },
             );
-            WgpuDrawerImage { atlas: self, alloc }
+            WgpuImage { atlas: self, alloc }
         } else {
             todo!()
         }
+    }
+}
+
+impl<'a> Graphics for WgpuGraphics<'a> {
+    type Image = WgpuImage<'a>;
+    type Drawer<'b> = WgpuDrawer<'a>;
+    fn load_image(&self, source: image::DynamicImage) -> Self::Image {
+        self.image_atlas.alloc(source)
     }
 }
 
@@ -334,7 +340,7 @@ pub struct WgpuDrawer<'a> {
 }
 
 impl<'a> Drawer for WgpuDrawer<'a> {
-    type Image = WgpuDrawerImage<'a>;
+    type Image = WgpuImage<'a>;
 
     fn load_image(&mut self, source: image::DynamicImage) -> Self::Image {
         self.image_atlas.alloc(source)
@@ -392,12 +398,12 @@ impl<'a> Drawer for WgpuDrawer<'a> {
 }
 
 /// An image that can be used by a [`WgpuDrawer`].
-pub struct WgpuDrawerImage<'a> {
+pub struct WgpuImage<'a> {
     atlas: &'a WgpuTextureAtlas<'a>,
     alloc: guillotiere::Allocation,
 }
 
-impl<'a> Drop for WgpuDrawerImage<'a> {
+impl<'a> Drop for WgpuImage<'a> {
     fn drop(&mut self) {
         unsafe { (*self.atlas.allocator.as_ptr()).deallocate(self.alloc.id) }
     }

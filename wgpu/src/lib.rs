@@ -1,7 +1,7 @@
 #![feature(generic_associated_types)]
-mod drawer;
+mod graphics;
 
-pub use drawer::*;
+pub use graphics::*;
 use fortify::*;
 use uial_core::*;
 
@@ -51,106 +51,136 @@ pub fn wgpu_app(state: impl State + 'static) -> impl Application<'static> {
     };
     surface.configure(&device, &config);
 
+    // Create graphics context
+    let device = &*Box::leak(Box::new(device));
+    let queue = &*Box::leak(Box::new(queue));
+    let graphics = Box::leak(Box::new(WgpuGraphics::new(&device, &queue))).borrow();
+
     // Return application
-    let size = state.new_cell(vec2(size.width as i32, size.height as i32));
     WgpuApp {
         state,
-        window,
         event_loop,
+        window,
         surface,
         config,
-        inner: fortify! {
-            let device = device;
-            let queue = queue;
-            let drawer = WgpuDrawerContext::new(&device, &queue);
-            yield WgpuAppInner {
-                size: &size,
-                device: &device,
-                queue: &queue,
-                drawer: &drawer
-            };
-        },
+        device,
+        queue,
+        graphics,
     }
 }
 
 /// An interface for setting up and running an application on the WebGPU platform.
-struct WgpuApp<S: State + 'static> {
+struct WgpuApp<S: State> {
     state: S,
-    window: winit::window::Window,
     event_loop: winit::event_loop::EventLoop<()>,
+    window: winit::window::Window,
     surface: wgpu::Surface,
     config: wgpu::SurfaceConfiguration,
-    inner: Fortify<WgpuAppInner<'static, S>>,
+    device: &'static wgpu::Device,
+    queue: &'static wgpu::Queue,
+    graphics: &'static WgpuGraphics<'static>,
+}
+/// Encapsulates the runtime resources for a [`WgpuApp`].
+#[derive(Lower)]
+struct WgpuRuntime<'a, S: State> {
+    state: S,
+    window: winit::window::Window,
+    surface: wgpu::Surface,
+    config: wgpu::SurfaceConfiguration,
+    size: &'a StateCell<S, Vector2<i32>>,
+    device: &'static wgpu::Device,
+    queue: &'static wgpu::Queue,
+    graphics: &'static WgpuGraphics<'static>,
+    elem: &'a dyn Element<WgpuGraphics<'static>, State = S>,
 }
 
-/// Encapsulates the borrowed resources for a [`WgpuApp`].
-#[derive(Lower)]
-struct WgpuAppInner<'a, S: State> {
-    size: &'a StateCell<S, Vector2<i32>>,
-    device: &'a wgpu::Device,
-    queue: &'a wgpu::Queue,
-    drawer: &'a WgpuDrawerContext<'a>,
+/// Describes the placement of a widget in a [`WgpuApp`].
+struct WinitPlacement<'a, S: State>(&'a StateCell<S, Vector2<i32>>);
+
+impl<'a, S: State> Placement for WinitPlacement<'a, S> {
+    type State = S;
+    fn rect(&self, s: &Self::State) -> Box2<i32> {
+        let size = s.get_cell(self.0);
+        box2(0, size.x, 0, size.y)
+    }
 }
 
 impl<S: State + 'static> Application<'static> for WgpuApp<S> {
     type State = S;
-    type Drawer = WgpuDrawer<'static>;
+    type Graphics = WgpuGraphics<'static>;
 
     fn state(&mut self) -> &mut Self::State {
         &mut self.state
     }
 
-    fn run(self, widget: impl Widget<Self::State, Self::Drawer> + 'static) -> ! {
-        let window = self.window;
-        let mut config = self.config;
-        let surface = self.surface;
-        let runtime = fortify! {
-            let inner = self.inner.borrow();
-            let elem = widget.place(&mut self.state, inner);
-            yield (inner, elem);
-        };
-        self.event_loop.run(move |event, _, control_flow| {
-            *control_flow = winit::event_loop::ControlFlow::Wait;
-            match event {
-                winit::event::Event::MainEventsCleared => {
-                    window.request_redraw();
-                }
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::Resized(size),
-                    ..
-                } => {
-                    config.width = size.width;
-                    config.height = size.height;
-                    surface.configure(runtime.borrow().0.device, &config);
-                }
-                winit::event::Event::RedrawRequested(_) => {
-                    let frame = surface
-                        .get_current_texture()
-                        .expect("Failed to acquire next swap chain texture");
-                    let view = frame
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
-                    let drawer = runtime.borrow().0.drawer;
-                    drawer.with_drawer(&view, (config.width, config.height), |d| {
-                        d.fill_rect(
-                            Paint::new(255, 0, 0, 255),
-                            box2(10, config.width as i32 - 10, 10, config.height as i32 - 10),
-                        );
-                    });
-                    frame.present();
-                }
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::CloseRequested,
-                    ..
-                } => *control_flow = winit::event_loop::ControlFlow::Exit,
-                _ => {}
-            }
-        })
+    fn run(self, widget: impl Widget<Self::State, Self::Graphics> + 'static) -> ! {
+        run(
+            self.event_loop,
+            fortify! {
+                let mut state = self.state;
+                let window = self.window;
+                let surface = self.surface;
+                let config = self.config;
+                let size = state.new_cell(vec2(config.width as i32, config.height as i32));
+                let device = self.device;
+                let queue = self.queue;
+                let graphics = self.graphics;
+                let elem = widget.place(&mut state, WinitPlacement(&size));
+                yield WgpuRuntime {
+                    state,
+                    window,
+                    surface,
+                    config,
+                    size: &size,
+                    device: &device,
+                    queue: &queue,
+                    graphics,
+                    elem: &elem
+                };
+            },
+        )
     }
 }
-impl<'a, S: State> Placement for &'a WgpuAppInner<'a, S> {
-    type State = S;
-    fn rect(&self, s: &Self::State) -> Box2<i32> {
-        todo!()
-    }
+
+fn run<S: State>(
+    event_loop: winit::event_loop::EventLoop<()>,
+    mut runtime: Fortify<WgpuRuntime<'static, S>>,
+) -> ! {
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = winit::event_loop::ControlFlow::Wait;
+        runtime.with_mut(|runtime| match event {
+            winit::event::Event::MainEventsCleared => {
+                runtime.window.request_redraw();
+            }
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::Resized(size),
+                ..
+            } => {
+                runtime.config.width = size.width;
+                runtime.config.height = size.height;
+                runtime.surface.configure(runtime.device, &runtime.config);
+                runtime.state.set_cell(runtime.size, vec2(size.width as i32, size.height as i32));
+            }
+            winit::event::Event::RedrawRequested(_) => {
+                let frame = runtime
+                    .surface
+                    .get_current_texture()
+                    .expect("Failed to acquire next swap chain texture");
+                let view = frame
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+                let width = runtime.config.width;
+                let height = runtime.config.height;
+                runtime.graphics.with_drawer(&view, (width, height), |d| {
+                    runtime.elem.draw_to(&runtime.state, d);
+                });
+                frame.present();
+            }
+            winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = winit::event_loop::ControlFlow::Exit,
+            _ => {}
+        })
+    })
 }

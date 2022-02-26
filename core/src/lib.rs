@@ -2,13 +2,13 @@
 #![feature(nonzero_ops)]
 mod geometry;
 mod state;
-mod drawer;
+mod graphics;
 mod application;
 pub mod widget;
 
 pub use geometry::*;
 pub use state::*;
-pub use drawer::*;
+pub use graphics::*;
 pub use application::*;
 pub use widget::{Widget, Placement, Element};
 pub use widget::WithSizingWidgetExt;
