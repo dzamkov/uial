@@ -354,7 +354,7 @@ impl<'a> Drawer for WgpuDrawer<'a> {
         trans: GridAffine2<i32>,
     ) {
         let alloc_rect = image.alloc.rectangle;
-        let src = Box2::new(
+        let src = box2(
             alloc_rect.min.x + src.min.x,
             alloc_rect.min.x + src.max.x,
             alloc_rect.min.y + src.min.y,

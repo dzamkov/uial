@@ -10,7 +10,7 @@ pub fn fill(paint: Paint) -> FillWidget {
 pub struct FillWidget(Paint);
 
 impl<S: State> WidgetBase<S> for FillWidget {
-    fn sizing(&self, _: &S) -> Cow<Sizing<i32>> {
+    fn sizing(&self, _: &S) -> Cow<Sizing> {
         Cow::Owned(Sizing::any())
     }
 }

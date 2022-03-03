@@ -1,11 +1,10 @@
-mod sizing;
 mod transform;
 
 pub use cgmath::vec2;
-pub use cgmath::{Matrix2, Vector2};
-pub use cgmath::ElementWise;
 pub use cgmath::BaseNum;
-pub use sizing::*;
+pub use cgmath::ElementWise;
+pub use cgmath::{Matrix2, Vector2};
+use std::cmp::{min, max};
 pub use transform::*;
 pub use GridDir2::{East, North, South, West};
 pub use GridRotation2::{Ccw, Cw, Flip};
@@ -19,16 +18,23 @@ pub struct Box2<S> {
 
 impl<S: BaseNum> Box2<S> {
     /// Constructs a new [`Box2`] using the provided values.
-    pub fn new(min_x: S, max_x: S, min_y: S, max_y: S) -> Self {
-        Box2 {
-            min: vec2(min_x, min_y),
-            max: vec2(max_x, max_y),
-        }
+    pub fn new(min: Vector2<S>, max: Vector2<S>) -> Self {
+        Box2 { min, max }
     }
 
     /// The size of this [`Box2`] along each axis.
     pub fn size(&self) -> Vector2<S> {
         self.max.sub_element_wise(self.min)
+    }
+}
+
+impl<S: BaseNum + Ord> Box2<S> {
+    /// Gets the intersection of two [`Box2`]s.
+    pub fn intersect(a: &Self, b: &Self) -> Self {
+        Box2 {
+            min: vec2(max(a.min.x, b.min.x), max(a.min.y, b.min.y)),
+            max: vec2(min(a.max.x, b.max.x), min(a.max.y, b.max.y)),
+        }
     }
 }
 
@@ -44,7 +50,7 @@ impl Box2<i32> {
 
 /// Shortcut for [`Box2::new`].
 pub fn box2<S: BaseNum>(min_x: S, max_x: S, min_y: S, max_y: S) -> Box2<S> {
-    Box2::new(min_x, max_x, min_y, max_y)
+    Box2::new(vec2(min_x, min_y), vec2(max_x, max_y))
 }
 
 impl<S: BaseNum> std::ops::Add<Vector2<S>> for Box2<S> {

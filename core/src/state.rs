@@ -1,5 +1,5 @@
 use fortify::Lower;
-use std::borrow::{Borrow, Cow};
+use std::borrow::Cow;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
@@ -11,7 +11,7 @@ pub trait State {
     type Cell<T: Clone>;
 
     /// A cache for a state-dependent value.
-    type Cache<D: OwnDependent<Self>>: From<D> + Borrow<D>;
+    type Cache<T: Clone>: Default;
 
     /// Creates a cell with the given initial value.
     fn new_cell<T: Clone>(&self, value: T) -> StateCell<Self, T>;
@@ -28,9 +28,9 @@ pub trait State {
     }
 
     /// Gets a cached value for this state.
-    fn get_cache<'a, D: OwnDependent<Self>>(
+    fn get_derived<'a, D: OwnDependent<Self>>(
         &'a self,
-        cached: &'a StateCache<Self, D>,
+        cached: &'a StateDerived<Self, D>,
     ) -> Cow<'a, D::Target>;
 }
 
@@ -38,16 +38,19 @@ pub trait State {
 pub trait StateCacheExt: State {
     /// Creates a new cached value based on the given [`OwnDependent`]. Note that a reference to
     /// the [`State`] is not required to create a cache and this method only exists to assist
-    /// type inference. Use `from` on [`StateCache`] to create the cache directly from `source`.
-    fn new_cache<D: OwnDependent<Self>>(&self, source: D) -> StateCache<Self, D> {
-        StateCache::from(source)
+    /// type inference. Use `new` on [`StateDerived`] to create the cache directly from `source`.
+    fn new_derived<D: OwnDependent<Self>>(&self, source: D) -> StateDerived<Self, D> {
+        StateDerived::new(source)
     }
 
     /// Creates a new cached value based on the given function. Note that a reference to
     /// the [`State`] is not required to create a cache and this method only exists to assist
-    /// type inference. Use `from` on [`StateCache`] to create the cache directly from `source`.
-    fn new_cache_fn<F: Fn(&Self) -> T, T: Clone>(&self, source: F) -> StateCache<Self, F> {
-        StateCache::from(source)
+    /// type inference. Use `new` on [`StateDerived`] to create the cache directly from `source`.
+    fn new_derived_fn<'a, T: Clone>(
+        &self,
+        source: impl Fn(&Self) -> T + 'a,
+    ) -> StateDerived<Self, Box<dyn Fn(&Self) -> T + 'a>> {
+        StateDerived::new(Box::new(source) as Box<dyn Fn(&Self) -> T>)
     }
 }
 
@@ -84,38 +87,39 @@ impl<S: State + ?Sized, T: Clone> Dependent<S> for StateCell<S, T> {
 }
 
 /// A cached [`State`]-dependent value.
-pub struct StateCache<S: State + ?Sized, D: OwnDependent<S>>(S::Cache<D>);
+pub struct StateDerived<
+    S: State + ?Sized,
+    D: OwnDependent<S>,
+    T: Clone = <D as Dependent<S>>::Target,
+> {
+    source: D,
+    cache: S::Cache<T>,
+}
 
-impl<S: State + ?Sized, D: OwnDependent<S>> StateCache<S, D> {
-    /// Constructs a new [`StateCache`] from the given internal representation.
-    pub fn new(source: S::Cache<D>) -> Self {
-        StateCache(source)
+impl<S: State + ?Sized, D: OwnDependent<S>> StateDerived<S, D> {
+    /// Constructs a new [`StateDerived`] for the given [`State`]-dependent value.
+    pub fn new(source: D) -> Self {
+        StateDerived {
+            source,
+            cache: S::Cache::<D::Target>::default()
+        }
+    }
+
+    /// Gets the [`OwnDependent`] from which the value of this [`StateDerived`] is derived.
+    pub fn source(&self) -> &D {
+        &self.source
+    }
+
+    /// Gets the cache for this [`StateDerived`].
+    pub fn cache(&self) -> &S::Cache<D::Target> {
+        &self.cache
     }
 }
 
-impl<S: State + ?Sized, D: OwnDependent<S>> From<D> for StateCache<S, D> {
-    fn from(source: D) -> Self {
-        Self::new(S::Cache::<D>::from(source))
-    }
-}
-
-impl<S: State + ?Sized, D: OwnDependent<S>> Deref for StateCache<S, D> {
-    type Target = S::Cache<D>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<S: State + ?Sized, D: OwnDependent<S>> DerefMut for StateCache<S, D> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<S: State + ?Sized, D: OwnDependent<S>> Dependent<S> for StateCache<S, D> {
+impl<S: State + ?Sized, D: OwnDependent<S>> Dependent<S> for StateDerived<S, D> {
     type Target = D::Target;
     fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, Self::Target> {
-        s.get_cache(self)
+        s.get_derived(self)
     }
 }
 
@@ -134,16 +138,42 @@ pub trait OwnDependent<S: State + ?Sized>: Dependent<S> {
     fn eval_own(&self, s: &S) -> Self::Target;
 }
 
-impl<S: State + ?Sized, F: Fn(&S) -> T, T: Clone> Dependent<S> for F {
+impl<'a, S: State + ?Sized, T: Clone> Dependent<S> for dyn Fn(&S) -> T + 'a {
     type Target = T;
-    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, Self::Target> {
+    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
         Cow::Owned(self.eval_own(s))
     }
 }
 
-impl<S: State + ?Sized, F: Fn(&S) -> T, T: Clone> OwnDependent<S> for F {
+impl<'a, S: State + ?Sized, T: Clone> OwnDependent<S> for dyn Fn(&S) -> T + 'a {
     fn eval_own(&self, s: &S) -> Self::Target {
         self(s)
+    }
+}
+
+impl<'a, S: State + ?Sized, T: Dependent<S> + ?Sized> Dependent<S> for &'a T {
+    type Target = T::Target;
+    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
+        (**self).eval(s)
+    }
+}
+
+impl<'a, S: State + ?Sized, T: OwnDependent<S> + ?Sized> OwnDependent<S> for &'a T {
+    fn eval_own(&self, s: &S) -> Self::Target {
+        (**self).eval_own(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Dependent<S> + ?Sized> Dependent<S> for Box<T> {
+    type Target = T::Target;
+    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: OwnDependent<S> + ?Sized> OwnDependent<S> for Box<T> {
+    fn eval_own(&self, s: &S) -> Self::Target {
+        (**self).eval_own(s)
     }
 }
 
@@ -190,9 +220,8 @@ pub struct ClockCell<'brand, T> {
 }
 
 /// A state-dependent cached value within the context of a [`ClockState`].
-pub struct ClockCache<'brand, D: OwnDependent<ClockState<'brand>>> {
-    cache: UnsafeCell<Option<(NonZeroU64, D::Target)>>,
-    source: D,
+pub struct ClockCache<'brand, T> {
+    cache: UnsafeCell<Option<(NonZeroU64, T)>>,
     marker: PhantomData<&'brand ()>,
 }
 
@@ -218,7 +247,7 @@ impl<'brand> ClockState<'brand> {
 
 impl<'brand> State for ClockState<'brand> {
     type Cell<T: Clone> = ClockCell<'brand, T>;
-    type Cache<D: OwnDependent<Self>> = ClockCache<'brand, D>;
+    type Cache<T: Clone> = ClockCache<'brand, T>;
 
     fn new_cell<T: Clone>(&self, value: T) -> StateCell<Self, T> {
         StateCell::new(ClockCell {
@@ -236,9 +265,9 @@ impl<'brand> State for ClockState<'brand> {
         unsafe { &mut *cell.value.get() }
     }
 
-    fn get_cache<D: OwnDependent<Self>>(&self, derived: &StateCache<Self, D>) -> Cow<D::Target> {
+    fn get_derived<D: OwnDependent<Self>>(&self, derived: &StateDerived<Self, D>) -> Cow<D::Target> {
         // Check cache
-        if let Some((clock, value)) = unsafe { &*derived.cache.get() } {
+        if let Some((clock, value)) = unsafe { &*derived.cache().cache.get() } {
             if *clock == self.clock {
                 return Cow::Borrowed(value);
             }
@@ -246,24 +275,17 @@ impl<'brand> State for ClockState<'brand> {
 
         // Compute value and store in cache
         let value = derived.source.eval_own(self);
-        let cache = unsafe { (*derived.cache.get()).insert((self.clock, value)) };
+        let cache = unsafe { (*derived.cache().cache.get()).insert((self.clock, value)) };
         Cow::Borrowed(&cache.1)
     }
 }
 
-impl<'brand, D: OwnDependent<ClockState<'brand>>> From<D> for ClockCache<'brand, D> {
-    fn from(source: D) -> Self {
+impl<'brand, T> Default for ClockCache<'brand, T> {
+    fn default() -> Self {
         ClockCache {
             cache: UnsafeCell::new(None),
-            source,
             marker: PhantomData,
         }
-    }
-}
-
-impl<'brand, D: OwnDependent<ClockState<'brand>>> Borrow<D> for ClockCache<'brand, D> {
-    fn borrow(&self) -> &D {
-        &self.source
     }
 }
 
@@ -272,13 +294,13 @@ fn test_clock_state() {
     ClockState::new(|mut state| {
         let a = state.new_cell(1);
         let b = state.new_cell(2);
-        let c = state.new_cache_fn(|state| state.get_cell(&a) + state.get_cell(&b));
+        let c = state.new_derived_fn(|state| state.get_cell(&a) + state.get_cell(&b));
         assert_eq!(*state.get_cell::<i32>(&a), 1);
         assert_eq!(*state.get_cell::<i32>(&b), 2);
-        assert_eq!(*state.get_cache(&c), 3);
-        assert_eq!(*state.get_cache(&c), 3);
+        assert_eq!(*state.get_derived(&c), 3);
+        assert_eq!(*state.get_derived(&c), 3);
         *state.modify_cell(&a) = 3;
         assert_eq!(*state.get_cell(&a), 3);
-        // assert_eq!(*state.get_derived(&c), 5);
+        assert_eq!(*state.get_derived(&c), 5);
     });
 }

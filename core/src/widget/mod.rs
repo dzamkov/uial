@@ -1,11 +1,13 @@
 mod fill;
 mod with_sizing;
+mod with_padding;
 
 use crate::*;
 pub use fill::*;
+pub use with_sizing::*;
+pub use with_padding::*;
 use fortify::{Fortify, Lower};
 use std::borrow::Cow;
-pub use with_sizing::*;
 
 /// A static description of a rectangular GUI element whose size and location has not yet been
 /// determined. A widget may have size constraints and preferences that affect how it is used in
@@ -23,7 +25,7 @@ pub trait Widget<S: State, G: Graphics>: WidgetBase<S> {
 /// The functionality of [`Widget`] that is independent of graphics context.
 pub trait WidgetBase<S: State> {
     /// Gets the sizing constraints and preferences for this [`Widget`] at the given state.
-    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>>;
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing>;
 }
 
 /// Specifies the size and location of a [`Widget`] and provides a means of interacting with other
@@ -63,7 +65,7 @@ where
     for<'a> T: Lower<'a>,
     for<'a> <T as Lower<'a>>::Target: WidgetBase<S>,
 {
-    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing<i32>> {
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing> {
         self.borrow().sizing(s)
     }
 }
