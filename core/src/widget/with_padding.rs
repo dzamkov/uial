@@ -4,10 +4,9 @@ use std::borrow::Cow;
 
 /// Contains with-padding-related extension methods for [`Widget`].
 pub trait WithPaddingWidgetExt<S: State>: WidgetBase<S> + Sized {
-    /// Constructs a [`Widget`] which applies a state-dependent amount of [`Padding`] onto
-    /// this widget.
+    /// Applies a state-dependent amount of [`Padding`] onto this widget.
     fn with_padding_dep<A: Dependent<S, Target = Padding>>(
-        &self,
+        self,
         padding: A,
     ) -> WithPaddingWidget<S, Self, A> {
         WithPaddingWidget(StateDerived::new(PaddingSizing {
@@ -16,17 +15,16 @@ pub trait WithPaddingWidgetExt<S: State>: WidgetBase<S> + Sized {
         }))
     }
 
-    /// Constructs a [`Widget`] which applies an amount of [`Padding`] onto this widget.
-    fn with_padding(&self, padding: Padding) -> WithPaddingWidget<S, Self, Const<Padding>> {
+    /// Applies an amount of [`Padding`] onto this widget.
+    fn with_padding(self, padding: Padding) -> WithPaddingWidget<S, Self, Const<Padding>> {
         self.with_padding_dep(Const::new(padding))
     }
 
-    /// Constructs a [`Widget`] which applies variable-sized padding to place this widget within
-    /// a larger rectangle. The alignment is specified by the relative portion of padding (between
-    /// 0 and 1) on the left and top of the widget. For example, a value of 0 for `left` will place
-    /// the inner widget as far left as possible, while a value of 0.5 will center it along
-    /// the horizontal axis.
-    fn with_align(&self, left: f32, top: f32) -> WithPaddingWidget<S, Self, Const<Padding>> {
+    /// Applies variable-sized padding to place this widget within a larger rectangle. The
+    /// alignment is specified by the relative portion of padding (between 0 and 1) on the left and
+    /// top of the widget. For example, a value of 0 for `left` will place the inner widget as far
+    /// left as possible, while a value of 0.5 will center it along the horizontal axis.
+    fn with_align(self, left: f32, top: f32) -> WithPaddingWidget<S, Self, Const<Padding>> {
         self.with_padding(Padding {
             left: 0,
             right: 0,
@@ -67,26 +65,26 @@ pub struct Padding {
 }
 
 /// A [`Widget`] which applies a state-dependent amount of [`Padding`] onto a source widget.
-pub struct WithPaddingWidget<'a, S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>>(
-    StateDerived<S, PaddingSizing<'a, T, A>>,
+pub struct WithPaddingWidget<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>>(
+    StateDerived<S, PaddingSizing<T, A>>,
 );
 
-struct PaddingSizing<'a, T, A> {
-    source: &'a T,
+struct PaddingSizing<T, A> {
+    source: T,
     padding: A,
 }
 
-impl<'a, S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> Dependent<S>
-    for PaddingSizing<'a, T, A>
+impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> Dependent<S>
+    for PaddingSizing<T, A>
 {
     type Target = Sizing;
-    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, Self::Target> {
         Cow::Owned(self.eval_own(s))
     }
 }
 
-impl<'a, S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> OwnDependent<S>
-    for PaddingSizing<'a, T, A>
+impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> OwnDependent<S>
+    for PaddingSizing<T, A>
 {
     fn eval_own(&self, s: &S) -> Self::Target {
         let sizing = &*self.source.sizing(s);
@@ -100,35 +98,35 @@ impl<'a, S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> OwnDepen
     }
 }
 
-unsafe impl<'a, 'b, S, T, A> Lower<'b> for WithPaddingWidget<'a, S, T, A>
+unsafe impl<'a, S, T, A> Lower<'a> for WithPaddingWidget<S, T, A>
 where
-    S: State + 'b,
-    T: WidgetBase<S> + Lower<'b>,
-    <T as Lower<'b>>::Target: WidgetBase<S> + Sized,
-    A: Dependent<S, Target = Padding> + Lower<'b>,
-    <A as Lower<'b>>::Target: Dependent<S, Target = Padding> + Sized,
+    S: State + 'a,
+    T: WidgetBase<S> + Lower<'a>,
+    <T as Lower<'a>>::Target: WidgetBase<S> + Sized,
+    A: Dependent<S, Target = Padding> + Lower<'a>,
+    <A as Lower<'a>>::Target: Dependent<S, Target = Padding> + Sized,
 {
-    type Target = WithPaddingWidget<'b, S, <T as Lower<'b>>::Target, <A as Lower<'b>>::Target>;
+    type Target = WithPaddingWidget<S, <T as Lower<'a>>::Target, <A as Lower<'a>>::Target>;
 }
 
-impl<'a, S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> WidgetBase<S>
-    for WithPaddingWidget<'a, S, T, A>
+impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Padding>> WidgetBase<S>
+    for WithPaddingWidget<S, T, A>
 {
-    fn sizing<'b>(&'b self, s: &'b S) -> Cow<'b, Sizing> {
+    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing> {
         s.get_derived(&self.0)
     }
 }
 
-impl<'a, S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Target = Padding>> Widget<S, G>
-    for WithPaddingWidget<'a, S, T, A>
+impl<S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Target = Padding>> Widget<S, G>
+    for WithPaddingWidget<S, T, A>
 {
-    type Elem<'b, P: Placement<State = S>>
+    type Elem<'a, P: Placement<State = S>>
     where
-        Self: 'b,
-    = T::Elem<'b, WithPaddingPlacement<'b, S, T, A, P>>;
+        Self: 'a,
+    = T::Elem<'a, WithPaddingPlacement<'a, S, T, A, P>>;
 
-    fn place<'b, P: Placement<State = S>>(&'b self, s: &mut S, placement: P) -> Self::Elem<'b, P> {
-        let sizing: &PaddingSizing<'a, T, A> = self.0.source();
+    fn place<'a, P: Placement<State = S>>(&'a self, s: &mut S, placement: P) -> Self::Elem<'a, P> {
+        let sizing: &PaddingSizing<T, A> = self.0.source();
         sizing.source.place(
             s,
             WithPaddingPlacement(StateDerived::new(PaddingRect {
@@ -171,7 +169,7 @@ struct PaddingRect<
     P: Placement<State = S>,
 > {
     padding: &'a A,
-    sizing: &'a StateDerived<S, PaddingSizing<'a, T, A>>,
+    sizing: &'a StateDerived<S, PaddingSizing<T, A>>,
     placement: P,
 }
 
