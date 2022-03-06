@@ -1,46 +1,66 @@
 use crate::*;
-use fortify::Lower;
+use crate::widget::*;
 use std::borrow::Cow;
 
 /// Contains with-sizing-related extension methods for [`Widget`].
-pub trait WithSizingWidgetExt<S: State>: WidgetBase<S> + Sized {
+pub trait WithSizingWidgetExt: WidgetBase + Sized {
     /// Imposes the size constraints and preferences from a state-dependent [`Sizing`] onto this
     /// widget.
-    fn with_sizing_dep<A: Dependent<S, Target = Sizing>>(
+    fn with_sizing_dep<A>(
         self,
         sizing: A,
-    ) -> WithSizingWidget<S, Self, A> {
-        WithSizingWidget(StateDerived::new(IntersectSizing {
+    ) -> WithSizingWidget<Self, A> {
+        WithSizingWidget {
             source: self,
             sizing,
-        }))
+        }
     }
 
     /// Imposes the size constraints and preferences from a [`Sizing`] onto this widget.
-    fn with_sizing(self, sizing: Sizing) -> WithSizingWidget<S, Self, Const<Sizing>> {
+    fn with_sizing(self, sizing: Sizing) -> WithSizingWidget<Self, Const<Sizing>> {
         self.with_sizing_dep(Const::new(sizing))
     }
 
     /// Imposes a specific size onto this widget.
-    fn with_size(self, size: Vector2<u32>) -> WithSizingWidget<S, Self, Const<Sizing>> {
+    fn with_size(self, size: Vector2<u32>) -> WithSizingWidget<Self, Const<Sizing>> {
         self.with_sizing_dep(Const::new(Sizing::exact(size)))
     }
 }
 
-impl<S: State, T: WidgetBase<S>> WithSizingWidgetExt<S> for T {}
+impl<T: WidgetBase> WithSizingWidgetExt for T {}
 
 /// A [`Widget`] which imposes the size constraints and preferences from a [`Sizing`] onto a source
 /// widget.
-pub struct WithSizingWidget<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Sizing>>(
+pub struct WithSizingWidget<T, A> {
+    source: T,
+    sizing: A,
+}
+
+impl<T: WidgetBase, A> WidgetBase for WithSizingWidget<T, A> {}
+
+impl<S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Target = Sizing>> Widget<S, G>
+    for WithSizingWidget<T, A>
+{
+    type Inst = WithSizingWidgetInst<S, T::Inst, A>;
+    fn inst(self, s: &mut S, g: &G) -> (Self::Inst, <Self::Inst as WidgetInst<S, G>>::Key) {
+        let (source, key) = self.source.inst(s, g);
+        let sizing = self.sizing;
+        let inst = WithSizingWidgetInst(StateDerived::new(IntersectSizing { source, sizing }));
+        (inst, key)
+    }
+}
+
+/// An instance of a [`WithSizingWidget`].
+pub struct WithSizingWidgetInst<S: State, T: WidgetInstBase<S>, A: Dependent<S, Target = Sizing>>(
     StateDerived<S, IntersectSizing<T, A>>,
 );
 
 struct IntersectSizing<T, A> {
-    sizing: A,
     source: T,
+    sizing: A,
 }
 
-impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Sizing>> Dependent<S>
+impl<S: State, T: WidgetInstBase<S>, A: Dependent<S, Target = Sizing>> Dependent<S>
     for IntersectSizing<T, A>
 {
     type Target = Sizing;
@@ -49,7 +69,7 @@ impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Sizing>> Dependent<S>
     }
 }
 
-impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Sizing>> OwnDependent<S>
+impl<S: State, T: WidgetInstBase<S>, A: Dependent<S, Target = Sizing>> OwnDependent<S>
     for IntersectSizing<T, A>
 {
     fn eval_own(&self, s: &S) -> Self::Target {
@@ -59,35 +79,30 @@ impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Sizing>> OwnDependent<
     }
 }
 
-unsafe impl<'a, S, T, A> Lower<'a> for WithSizingWidget<S, T, A>
-where
-    S: State + 'a,
-    T: WidgetBase<S> + Lower<'a>,
-    <T as Lower<'a>>::Target: WidgetBase<S> + Sized,
-    A: Dependent<S, Target = Sizing> + Lower<'a>,
-    <A as Lower<'a>>::Target: Dependent<S, Target = Sizing> + Sized,
-{
-    type Target = WithSizingWidget<S, <T as Lower<'a>>::Target, <A as Lower<'a>>::Target>;
-}
-
-impl<S: State, T: WidgetBase<S>, A: Dependent<S, Target = Sizing>> WidgetBase<S>
-    for WithSizingWidget<S, T, A>
+impl<S: State, T: WidgetInstBase<S>, A: Dependent<S, Target = Sizing>> WidgetInstBase<S>
+    for WithSizingWidgetInst<S, T, A>
 {
     fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing> {
         s.get_derived(&self.0)
     }
 }
 
-impl<S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Target = Sizing>> Widget<S, G>
-    for WithSizingWidget<S, T, A>
+impl<S: State, G: Graphics, T: WidgetInst<S, G>, A: Dependent<S, Target = Sizing>> WidgetInst<S, G>
+    for WithSizingWidgetInst<S, T, A>
 {
+    type Key = T::Key;
+
     type Elem<'a, P: Placement<State = S>>
     where
-        Self: 'a,
-    = T::Elem<'a, P>;
+        Self: 'a = T::Elem<'a, P>;
 
-    fn place<'a, P: Placement<State = S>>(&'a self, s: &mut S, placement: P) -> Self::Elem<'a, P> {
+    fn place<'a, P: Placement<State = S>>(
+        &'a self,
+        s: &mut S,
+        key: Self::Key,
+        placement: P,
+    ) -> Self::Elem<'a, P> {
         let sizing: &IntersectSizing<T, A> = self.0.source();
-        sizing.source.place(s, placement)
+        sizing.source.place(s, key, placement)
     }
 }

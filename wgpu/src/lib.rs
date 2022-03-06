@@ -4,6 +4,7 @@ mod graphics;
 pub use graphics::*;
 use fortify::*;
 use uial_core::*;
+use uial_core::widget::{WidgetInst, Placement, Element};
 
 /// Creates an [`Application`] for the WebGPU platform.
 pub fn wgpu_app(state: impl State + 'static) -> impl Application<'static> {
@@ -125,7 +126,8 @@ impl<S: State + 'static> Application<'static> for WgpuApp<S> {
                 let device = self.device;
                 let queue = self.queue;
                 let graphics = self.graphics;
-                let elem = widget.place(&mut state, WinitPlacement(&size));
+                let (widget, key) = widget.inst(&mut state, &graphics);
+                let elem = widget.place(&mut state, key, WinitPlacement(&size));
                 yield WgpuRuntime {
                     state,
                     window,
