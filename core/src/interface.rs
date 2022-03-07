@@ -12,7 +12,7 @@ impl<T> Interface<T> {
     pub fn from_ref(source: &T) -> &Self {
         unsafe { transmute(source) }
     }
-    
+
     /// Gets a mutable [`Interface`] wrapper over the given interface.
     pub fn from_mut(source: &mut T) -> &mut Self {
         unsafe { transmute(source) }
@@ -48,10 +48,13 @@ impl<S: State> Interface<S> {
     }
 
     /// Calls [`State::get_derived`].
-    pub fn get_derived<'a, D: OwnDependent<S>>(
+    pub fn get_derived<'a, D: DerivedFn<S>>(
         &'a self,
         cached: &'a StateDerived<S, D>,
-    ) -> std::borrow::Cow<'a, D::Target> {
+    ) -> std::borrow::Cow<'a, D::Target>
+    where
+        D::Target: Clone,
+    {
         self.as_ref().get_derived(cached)
     }
 }

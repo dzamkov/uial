@@ -1,9 +1,10 @@
-use fortify::Lower;
 use std::borrow::Cow;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+use std::sync::Arc;
 
 /// Represents the state of an application at a certain moment.
 pub trait State {
@@ -28,7 +29,7 @@ pub trait State {
     }
 
     /// Gets a cached value for this state.
-    fn get_derived<'a, D: OwnDependent<Self>>(
+    fn get_derived<'a, D: DerivedFn<Self>>(
         &'a self,
         cached: &'a StateDerived<Self, D>,
     ) -> Cow<'a, D::Target>;
@@ -36,10 +37,10 @@ pub trait State {
 
 /// Contains caching-related extension methods for [`State`].
 pub trait StateCacheExt: State {
-    /// Creates a new cached value based on the given [`OwnDependent`]. Note that a reference to
+    /// Creates a new cached value based on the given [`DerivedFn`]. Note that a reference to
     /// the [`State`] is not required to create a cache and this method only exists to assist
     /// type inference. Use `new` on [`StateDerived`] to create the cache directly from `source`.
-    fn new_derived<D: OwnDependent<Self>>(&self, source: D) -> StateDerived<Self, D> {
+    fn new_derived<D: DerivedFn<Self>>(&self, source: D) -> StateDerived<Self, D> {
         StateDerived::new(source)
     }
 
@@ -79,33 +80,53 @@ impl<S: State + ?Sized, T: Clone> DerefMut for StateCell<S, T> {
     }
 }
 
-impl<S: State + ?Sized, T: Clone> Dependent<S> for StateCell<S, T> {
-    type Target = T;
-    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, Self::Target> {
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for StateCell<S, T> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
         Cow::Borrowed(s.get_cell(self))
     }
 }
 
+impl<'a, S: State + ?Sized, T: Clone> Dependent<S, T> for &'a StateCell<S, T> {
+    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for Box<StateCell<S, T>> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for Rc<StateCell<S, T>> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for Arc<StateCell<S, T>> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
 /// A cached [`State`]-dependent value.
-pub struct StateDerived<
-    S: State + ?Sized,
-    D: OwnDependent<S>,
-    T: Clone = <D as Dependent<S>>::Target,
-> {
+pub struct StateDerived<S: State + ?Sized, D: DerivedFn<S>, T: Clone = <D as DerivedFn<S>>::Target>
+{
     source: D,
     cache: S::Cache<T>,
 }
 
-impl<S: State + ?Sized, D: OwnDependent<S>> StateDerived<S, D> {
-    /// Constructs a new [`StateDerived`] for the given [`State`]-dependent value.
+impl<S: State + ?Sized, D: DerivedFn<S>> StateDerived<S, D> {
+    /// Constructs a new [`StateDerived`] based on the given [`DerivedFn`].
     pub fn new(source: D) -> Self {
         StateDerived {
             source,
-            cache: S::Cache::<D::Target>::default()
+            cache: S::Cache::<D::Target>::default(),
         }
     }
 
-    /// Gets the [`OwnDependent`] from which the value of this [`StateDerived`] is derived.
+    /// Gets the [`DerivedFn`] from which the value of this [`StateDerived`] is derived.
     pub fn source(&self) -> &D {
         &self.source
     }
@@ -116,90 +137,96 @@ impl<S: State + ?Sized, D: OwnDependent<S>> StateDerived<S, D> {
     }
 }
 
-impl<S: State + ?Sized, D: OwnDependent<S>> Dependent<S> for StateDerived<S, D> {
-    type Target = D::Target;
-    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, Self::Target> {
+impl<S: State + ?Sized, D: DerivedFn<S, Target = T>, T: Clone> Dependent<S, T>
+    for StateDerived<S, D, T>
+{
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
         s.get_derived(self)
     }
 }
 
-/// A [`State`]-dependent value of a certain type.
-pub trait Dependent<S: State + ?Sized> {
-    /// The underlying type of this state-dependent value.
+impl<'a, S: State + ?Sized, D: DerivedFn<S, Target = T>, T: Clone> Dependent<S, T>
+    for &'a StateDerived<S, D, T>
+{
+    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, D: DerivedFn<S, Target = T>, T: Clone> Dependent<S, T>
+    for Box<StateDerived<S, D, T>>
+{
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, D: DerivedFn<S, Target = T>, T: Clone> Dependent<S, T>
+    for Rc<StateDerived<S, D, T>>
+{
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, D: DerivedFn<S, Target = T>, T: Clone> Dependent<S, T>
+    for Arc<StateDerived<S, D, T>>
+{
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+/// A (potentially) [`State`]-dependent value of a certain type.
+pub trait Dependent<S: State + ?Sized, T: Clone> {
+    /// Evaluates this dependent value for the given state.
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T>;
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for T {
+    fn eval<'a>(&'a self, _: &'a S) -> Cow<'a, T> {
+        Cow::Borrowed(self)
+    }
+}
+
+impl<'a, S: State + ?Sized, T: Clone> Dependent<S, T> for &'a T {
+    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for Box<T> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for Rc<T> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+impl<S: State + ?Sized, T: Clone> Dependent<S, T> for Arc<T> {
+    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, T> {
+        (**self).eval(s)
+    }
+}
+
+/// A function which produces a [`State`]-dependent value of a certain type.
+pub trait DerivedFn<S: State + ?Sized> {
+    /// The type of value produced by this [`DerivedFn`].
     type Target: Clone;
 
-    /// Evaluates this dependent value for the given state.
-    fn eval<'a>(&'a self, s: &'a S) -> Cow<'a, Self::Target>;
+    /// Evaluates this [`DerivedFn`] for the given state.
+    fn eval(&self, s: &S) -> Self::Target;
 }
 
-/// A [`Dependent`] which always produces an owned value when evaluated.
-pub trait OwnDependent<S: State + ?Sized>: Dependent<S> {
-    /// Evaluates this dependent value for the given state.
-    fn eval_own(&self, s: &S) -> Self::Target;
-}
-
-impl<'a, S: State + ?Sized, T: Clone> Dependent<S> for dyn Fn(&S) -> T + 'a {
+impl<S: State + ?Sized, F: Fn(&S) -> T, T: Clone> DerivedFn<S> for F {
     type Target = T;
-    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
-        Cow::Owned(self.eval_own(s))
-    }
-}
-
-impl<'a, S: State + ?Sized, T: Clone> OwnDependent<S> for dyn Fn(&S) -> T + 'a {
-    fn eval_own(&self, s: &S) -> Self::Target {
+    fn eval(&self, s: &S) -> Self::Target {
         self(s)
     }
-}
-
-impl<'a, S: State + ?Sized, T: Dependent<S> + ?Sized> Dependent<S> for &'a T {
-    type Target = T::Target;
-    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
-        (**self).eval(s)
-    }
-}
-
-impl<'a, S: State + ?Sized, T: OwnDependent<S> + ?Sized> OwnDependent<S> for &'a T {
-    fn eval_own(&self, s: &S) -> Self::Target {
-        (**self).eval_own(s)
-    }
-}
-
-impl<S: State + ?Sized, T: Dependent<S> + ?Sized> Dependent<S> for Box<T> {
-    type Target = T::Target;
-    fn eval<'b>(&'b self, s: &'b S) -> Cow<'b, Self::Target> {
-        (**self).eval(s)
-    }
-}
-
-impl<S: State + ?Sized, T: OwnDependent<S> + ?Sized> OwnDependent<S> for Box<T> {
-    fn eval_own(&self, s: &S) -> Self::Target {
-        (**self).eval_own(s)
-    }
-}
-
-/// A [`Dependent`] wrapper over a constant value.
-pub struct Const<T>(T);
-
-impl<T> Const<T> {
-    /// Constructs a new [`Const`] wrapper over the given value.
-    pub fn new(value: T) -> Self {
-        Self(value)
-    }
-}
-
-impl<S: State, T: Clone> Dependent<S> for Const<T> {
-    type Target = T;
-    fn eval<'a>(&'a self, _: &'a S) -> Cow<'a, Self::Target> {
-        Cow::Borrowed(&self.0)
-    }
-}
-
-unsafe impl<'a, T> Lower<'a> for Const<T>
-where
-    T: Lower<'a>,
-    <T as Lower<'a>>::Target: Sized,
-{
-    type Target = Const<<T as Lower<'a>>::Target>;
 }
 
 /// A simple implementation of [`State`] which uses an internal version counter (i.e. the "clock")
@@ -265,7 +292,7 @@ impl<'brand> State for ClockState<'brand> {
         unsafe { &mut *cell.value.get() }
     }
 
-    fn get_derived<D: OwnDependent<Self>>(&self, derived: &StateDerived<Self, D>) -> Cow<D::Target> {
+    fn get_derived<D: DerivedFn<Self>>(&self, derived: &StateDerived<Self, D>) -> Cow<D::Target> {
         // Check cache
         if let Some((clock, value)) = unsafe { &*derived.cache().cache.get() } {
             if *clock == self.clock {
@@ -274,7 +301,7 @@ impl<'brand> State for ClockState<'brand> {
         }
 
         // Compute value and store in cache
-        let value = derived.source.eval_own(self);
+        let value = derived.source.eval(self);
         let cache = unsafe { (*derived.cache().cache.get()).insert((self.clock, value)) };
         Cow::Borrowed(&cache.1)
     }
