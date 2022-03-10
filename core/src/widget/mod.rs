@@ -4,10 +4,10 @@ mod with_padding;
 mod with_sizing;
 
 use crate::*;
-use fortify::Lower;
-use std::borrow::Cow;
 pub use fill::*;
+use fortify::Lower;
 pub use prepare::*;
+use std::borrow::Cow;
 pub use with_padding::*;
 pub use with_sizing::*;
 
@@ -16,17 +16,23 @@ pub use with_sizing::*;
 /// a layout.
 pub trait Widget<S: State, G: Graphics>: WidgetBase {
     /// The type of [`WidgetInst`] that results from instantiating this widget.
-    type Inst: WidgetInst<S, G>;
+    type Inst<'a>: WidgetInst<S, G>
+    where
+        G: 'a;
 
     /// Instantiates this [`Widget`], providing it with the specific [`State`] and [`Graphics`] it
     /// will be using. This is an opportunity for the [`Widget`] to initialize state and
     /// prepare graphics resources.
-    fn inst(self, s: &mut S, g: &G) -> (Self::Inst, <Self::Inst as WidgetInst<S, G>>::Key);
+    fn inst<'a>(
+        self,
+        s: &mut S,
+        g: &'a G,
+    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst<S, G>>::Key);
 }
 
 /// A widget of some [`State`] and [`Graphics`] type. This is used to defined [`Widget`] extension
 /// methods.
-pub trait WidgetBase { }
+pub trait WidgetBase {}
 
 /// The functionality of [`WidgetInst`] that is independent of graphics context.
 pub trait WidgetInstBase<S: State> {

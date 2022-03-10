@@ -1,15 +1,12 @@
-use crate::*;
 use crate::widget::*;
+use crate::*;
 use std::borrow::Cow;
 
 /// Contains with-sizing-related extension methods for [`Widget`].
 pub trait WithSizingWidgetExt: WidgetBase + Sized {
     /// Imposes the size constraints and preferences from a state-dependent [`Sizing`] onto this
     /// widget.
-    fn with_sizing<A>(
-        self,
-        sizing: A,
-    ) -> WithSizingWidget<Self, A> {
+    fn with_sizing<A>(self, sizing: A) -> WithSizingWidget<Self, A> {
         WithSizingWidget {
             source: self,
             sizing,
@@ -36,8 +33,16 @@ impl<T: WidgetBase, A> WidgetBase for WithSizingWidget<T, A> {}
 impl<S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Sizing>> Widget<S, G>
     for WithSizingWidget<T, A>
 {
-    type Inst = WithSizingWidgetInst<S, T::Inst, A>;
-    fn inst(self, s: &mut S, g: &G) -> (Self::Inst, <Self::Inst as WidgetInst<S, G>>::Key) {
+    type Inst<'a>
+    where
+        G: 'a,
+    = WithSizingWidgetInst<S, T::Inst<'a>, A>;
+    
+    fn inst<'a>(
+        self,
+        s: &mut S,
+        g: &'a G,
+    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst<S, G>>::Key) {
         let (source, key) = self.source.inst(s, g);
         let sizing = self.sizing;
         let inst = WithSizingWidgetInst(StateDerived::new(IntersectSizing { source, sizing }));
@@ -81,7 +86,8 @@ impl<S: State, G: Graphics, T: WidgetInst<S, G>, A: Dependent<S, Sizing>> Widget
 
     type Elem<'a, P: Placement<State = S>>
     where
-        Self: 'a = T::Elem<'a, P>;
+        Self: 'a,
+    = T::Elem<'a, P>;
 
     fn place<'a, P: Placement<State = S>>(
         &'a self,

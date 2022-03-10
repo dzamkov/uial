@@ -1,5 +1,5 @@
-use crate::*;
 use crate::widget::*;
+use crate::*;
 use std::borrow::Cow;
 
 /// Constructs a [`Widget`] that displays as a single solid [`Paint`] and is not interactable.
@@ -11,11 +11,15 @@ pub fn fill(paint: Paint) -> FillWidget {
 #[derive(fortify::Lower)]
 pub struct FillWidget(Paint);
 
-impl WidgetBase for FillWidget { }
+impl WidgetBase for FillWidget {}
 
 impl<S: State, G: Graphics> Widget<S, G> for FillWidget {
-    type Inst = FillWidget;
-    fn inst(self, _: &mut S, _: &G) -> (Self::Inst, ()) {
+    type Inst<'a>
+    where
+        G: 'a,
+    = FillWidget;
+    
+    fn inst(self, _: &mut S, _: &G) -> (FillWidget, ()) {
         (self, ())
     }
 }
@@ -31,7 +35,8 @@ impl<S: State, G: Graphics> WidgetInst<S, G> for FillWidget {
 
     type Elem<'a, P: Placement<State = S>>
     where
-        Self: 'a = FillElement<P>;
+        Self: 'a,
+    = FillElement<P>;
 
     fn place<'a, P: Placement<State = S>>(
         &'a self,
