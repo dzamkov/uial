@@ -1,10 +1,10 @@
 #![feature(generic_associated_types)]
 mod graphics;
 
-pub use graphics::*;
 use fortify::*;
+pub use graphics::*;
+use uial_core::widget::{Element, Placement, WidgetInst};
 use uial_core::*;
-use uial_core::widget::{WidgetInst, Placement, Element};
 
 /// Creates an [`Application`] for the WebGPU platform.
 pub fn wgpu_app(state: impl State + 'static) -> impl Application<'static> {
@@ -114,7 +114,10 @@ impl<S: State + 'static> Application<'static> for WgpuApp<S> {
         &mut self.state
     }
 
-    fn run(self, widget: impl Widget<Self::State, Self::Graphics> + 'static) -> ! {
+    fn run(
+        self,
+        widget: impl Widget<State = Self::State, Graphics = Self::Graphics> + 'static,
+    ) -> ! {
         run(
             self.event_loop,
             fortify! {
@@ -161,7 +164,9 @@ fn run<S: State>(
                 runtime.config.width = size.width;
                 runtime.config.height = size.height;
                 runtime.surface.configure(runtime.device, &runtime.config);
-                runtime.state.set_cell(runtime.size, vec2(size.width as i32, size.height as i32));
+                runtime
+                    .state
+                    .set_cell(runtime.size, vec2(size.width as i32, size.height as i32));
             }
             winit::event::Event::RedrawRequested(_) => {
                 let frame = runtime

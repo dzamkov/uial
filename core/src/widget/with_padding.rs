@@ -4,9 +4,12 @@ use fortify::Lower;
 use std::borrow::Cow;
 
 /// Contains with-padding-related extension methods for [`Widget`].
-pub trait WithPaddingWidgetExt: WidgetBase + Sized {
+pub trait WithPaddingWidgetExt: Widget + Sized {
     /// Applies a state-dependent amount of [`Padding`] onto this widget.
-    fn with_padding<A>(self, padding: A) -> WithPaddingWidget<Self, A> {
+    fn with_padding<A: Dependent<Self::State, Padding>>(
+        self,
+        padding: A,
+    ) -> WithPaddingWidget<Self, A> {
         WithPaddingWidget {
             source: self,
             padding,
@@ -29,7 +32,7 @@ pub trait WithPaddingWidgetExt: WidgetBase + Sized {
     }
 }
 
-impl<T: WidgetBase> WithPaddingWidgetExt for T {}
+impl<T: Widget> WithPaddingWidgetExt for T {}
 
 /// Specifies an amount of padding that can be applied to rectangular content.
 #[derive(Lower, Clone, Copy)]
@@ -63,21 +66,19 @@ pub struct WithPaddingWidget<T, A> {
     padding: A,
 }
 
-impl<T: WidgetBase, A> WidgetBase for WithPaddingWidget<T, A> {}
-
-impl<S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Padding>> Widget<S, G>
-    for WithPaddingWidget<T, A>
-{
+impl<T: Widget, A: Dependent<T::State, Padding>> Widget for WithPaddingWidget<T, A> {
+    type State = T::State;
+    type Graphics = T::Graphics;
     type Inst<'a>
     where
-        G: 'a,
-    = WithPaddingWidgetInst<S, T::Inst<'a>, A>;
-    
+        T::Graphics: 'a,
+    = WithPaddingWidgetInst<T::Inst<'a>, A>;
+
     fn inst<'a>(
         self,
-        s: &mut S,
-        g: &'a G,
-    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst<S, G>>::Key) {
+        s: &mut T::State,
+        g: &'a T::Graphics,
+    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst>::Key) {
         let (source, key) = self.source.inst(s, g);
         let padding = self.padding;
         let inst = WithPaddingWidgetInst(StateDerived::new(PaddingSizing { source, padding }));
@@ -86,8 +87,8 @@ impl<S: State, G: Graphics, T: Widget<S, G>, A: Dependent<S, Padding>> Widget<S,
 }
 
 /// An instance of a [`WithPaddingWidget`].
-pub struct WithPaddingWidgetInst<S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>>(
-    StateDerived<S, PaddingSizing<T, A>>,
+pub struct WithPaddingWidgetInst<T: WidgetInst, A: Dependent<T::State, Padding>>(
+    StateDerived<T::State, PaddingSizing<T, A>>,
 );
 
 struct PaddingSizing<T, A> {
@@ -95,11 +96,9 @@ struct PaddingSizing<T, A> {
     padding: A,
 }
 
-impl<S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>> DerivedFn<S>
-    for PaddingSizing<T, A>
-{
+impl<T: WidgetInst, A: Dependent<T::State, Padding>> DerivedFn<T::State> for PaddingSizing<T, A> {
     type Target = Sizing;
-    fn eval<'a>(&'a self, s: &'a S) -> Self::Target {
+    fn eval<'a>(&'a self, s: &'a T::State) -> Self::Target {
         let sizing = &*self.source.sizing(s);
         let padding = &*self.padding.eval(s);
         sizing.with_padding(
@@ -111,27 +110,22 @@ impl<S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>> DerivedFn<S>
     }
 }
 
-impl<S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>> WidgetInstBase<S>
-    for WithPaddingWidgetInst<S, T, A>
-{
-    fn sizing<'a>(&'a self, s: &'a S) -> Cow<'a, Sizing> {
-        s.get_derived(&self.0)
-    }
-}
-
-impl<S: State, G: Graphics, T: WidgetInst<S, G>, A: Dependent<S, Padding>> WidgetInst<S, G>
-    for WithPaddingWidgetInst<S, T, A>
-{
+impl<T: WidgetInst, A: Dependent<T::State, Padding>> WidgetInst for WithPaddingWidgetInst<T, A> {
+    type State = T::State;
+    type Graphics = T::Graphics;
     type Key = T::Key;
-
-    type Elem<'a, P: Placement<State = S>>
+    type Elem<'a, P: Placement<State = T::State>>
     where
         Self: 'a,
-    = T::Elem<'a, WithPaddingPlacement<'a, S, T, A, P>>;
+    = T::Elem<'a, WithPaddingPlacement<'a, T, A, P>>;
 
-    fn place<'a, P: Placement<State = S>>(
+    fn sizing<'a>(&'a self, s: &'a T::State) -> Cow<'a, Sizing> {
+        s.get_derived(&self.0)
+    }
+
+    fn place<'a, P: Placement<State = T::State>>(
         &'a self,
-        s: &mut S,
+        s: &mut T::State,
         key: Self::Key,
         placement: P,
     ) -> Self::Elem<'a, P> {
@@ -151,16 +145,15 @@ impl<S: State, G: Graphics, T: WidgetInst<S, G>, A: Dependent<S, Padding>> Widge
 /// The placement for an inner [`Widget`] inside a [`WithPaddingWidget`].
 pub struct WithPaddingPlacement<
     'a,
-    S: State,
-    T: WidgetInstBase<S>,
-    A: Dependent<S, Padding>,
-    P: Placement<State = S>,
->(StateDerived<S, PaddingRect<'a, S, T, A, P>>);
+    T: WidgetInst,
+    A: Dependent<T::State, Padding>,
+    P: Placement<State = T::State>,
+>(StateDerived<T::State, PaddingRect<'a, T, A, P>>);
 
-impl<'a, S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>, P: Placement<State = S>>
-    Placement for WithPaddingPlacement<'a, S, T, A, P>
+impl<'a, T: WidgetInst, A: Dependent<T::State, Padding>, P: Placement<State = T::State>> Placement
+    for WithPaddingPlacement<'a, T, A, P>
 {
-    type State = S;
+    type State = T::State;
     fn rect(&self, s: &Self::State) -> Box2<i32> {
         *s.get_derived(&self.0)
     }
@@ -168,21 +161,20 @@ impl<'a, S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>, P: Placement<
 
 struct PaddingRect<
     'a,
-    S: State,
-    T: WidgetInstBase<S>,
-    A: Dependent<S, Padding>,
-    P: Placement<State = S>,
+    T: WidgetInst,
+    A: Dependent<T::State, Padding>,
+    P: Placement<State = T::State>,
 > {
     padding: &'a A,
-    sizing: &'a StateDerived<S, PaddingSizing<T, A>>,
+    sizing: &'a StateDerived<T::State, PaddingSizing<T, A>>,
     placement: P,
 }
 
-impl<'a, S: State, T: WidgetInstBase<S>, A: Dependent<S, Padding>, P: Placement<State = S>>
-    DerivedFn<S> for PaddingRect<'a, S, T, A, P>
+impl<'a, T: WidgetInst, A: Dependent<T::State, Padding>, P: Placement<State = T::State>>
+    DerivedFn<T::State> for PaddingRect<'a, T, A, P>
 {
     type Target = Box2<i32>;
-    fn eval<'b>(&'b self, s: &'b S) -> Self::Target {
+    fn eval<'b>(&'b self, s: &'b T::State) -> Self::Target {
         let padding = &*self.padding.eval(s);
         let sizing = &*self.sizing.eval(s);
         let container = self.placement.rect(s);

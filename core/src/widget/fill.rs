@@ -1,42 +1,48 @@
 use crate::widget::*;
 use crate::*;
 use std::borrow::Cow;
+use std::marker::PhantomData;
 
 /// Constructs a [`Widget`] that displays as a single solid [`Paint`] and is not interactable.
-pub fn fill(paint: Paint) -> FillWidget {
-    FillWidget(paint)
+pub fn fill<S: State, G: Graphics>(paint: Paint) -> FillWidget<S, G> {
+    FillWidget {
+        paint,
+        marker: PhantomData,
+    }
 }
 
 /// A [`Widget`] which displays as a single solid [`Paint`] and is not interactable.
 #[derive(fortify::Lower)]
-pub struct FillWidget(Paint);
+pub struct FillWidget<S: State, G: Graphics> {
+    paint: Paint,
+    marker: PhantomData<fn(S, G)>,
+}
 
-impl WidgetBase for FillWidget {}
-
-impl<S: State, G: Graphics> Widget<S, G> for FillWidget {
+impl<S: State, G: Graphics> Widget for FillWidget<S, G> {
+    type State = S;
+    type Graphics = G;
     type Inst<'a>
     where
         G: 'a,
-    = FillWidget;
-    
-    fn inst(self, _: &mut S, _: &G) -> (FillWidget, ()) {
+    = FillWidget<S, G>;
+
+    fn inst(self, _: &mut S, _: &G) -> (FillWidget<S, G>, ()) {
         (self, ())
     }
 }
 
-impl<S: State> WidgetInstBase<S> for FillWidget {
-    fn sizing<'a>(&'a self, _: &'a S) -> Cow<'a, Sizing> {
-        Cow::Owned(Sizing::any())
-    }
-}
-
-impl<S: State, G: Graphics> WidgetInst<S, G> for FillWidget {
+impl<S: State, G: Graphics> WidgetInst for FillWidget<S, G> {
+    type State = S;
+    type Graphics = G;
     type Key = ();
-
     type Elem<'a, P: Placement<State = S>>
     where
         Self: 'a,
     = FillElement<P>;
+
+    fn sizing<'a>(&'a self, _: &'a S) -> Cow<'a, Sizing> {
+        Cow::Owned(Sizing::any())
+    }
 
     fn place<'a, P: Placement<State = S>>(
         &'a self,
@@ -44,7 +50,7 @@ impl<S: State, G: Graphics> WidgetInst<S, G> for FillWidget {
         _: (),
         placement: P,
     ) -> Self::Elem<'a, P> {
-        FillElement(self.0, placement)
+        FillElement(self.paint, placement)
     }
 }
 

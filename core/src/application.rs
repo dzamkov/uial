@@ -12,5 +12,5 @@ pub trait Application<'a> {
     fn state(&mut self) -> &mut Self::State;
 
     /// Runs a [`Widget`].
-    fn run(self, widget: impl Widget<Self::State, Self::Graphics> + 'a) -> !;
+    fn run(self, widget: impl Widget<State = Self::State, Graphics = Self::Graphics> + 'a) -> !;
 }
