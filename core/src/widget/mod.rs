@@ -1,4 +1,5 @@
 mod fill;
+mod image;
 mod prepare;
 mod with_padding;
 mod with_sizing;
@@ -6,6 +7,7 @@ mod with_sizing;
 use crate::*;
 pub use fill::*;
 use fortify::Lower;
+pub use self::image::*;
 pub use prepare::*;
 use std::borrow::Cow;
 pub use with_padding::*;

@@ -13,3 +13,4 @@ members = [
 uial-core = { path = "core" }
 uial-wgpu = { path = "wgpu" }
 fortify = "0.3.1"
+image = "0.23.14"

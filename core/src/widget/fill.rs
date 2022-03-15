@@ -24,9 +24,9 @@ impl<S: State, G: Graphics> Widget for FillWidget<S, G> {
     type Inst<'a>
     where
         G: 'a,
-    = FillWidget<S, G>;
+    = Self;
 
-    fn inst(self, _: &mut S, _: &G) -> (FillWidget<S, G>, ()) {
+    fn inst(self, _: &mut S, _: &G) -> (Self, ()) {
         (self, ())
     }
 }

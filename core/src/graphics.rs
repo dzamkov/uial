@@ -3,7 +3,7 @@ use crate::*;
 /// An interface for a graphics context.
 pub trait Graphics {
     /// An image that can be loaded and drawn using this graphics context.
-    type Image;
+    type Image: Image;
 
     /// An interface for drawing to a two-dimensional surface using this graphics context.
     type Drawer<'a>: Drawer<Image = Self::Image>;
@@ -16,7 +16,7 @@ pub trait Graphics {
 /// An interface for precisely drawing on a discrete two-dimensional surface.
 pub trait Drawer {
     /// An image that can be loaded and drawn using this drawer.
-    type Image;
+    type Image: Image;
 
     /// Loads an image for use with this drawer.
     // TODO: Also accept references to image data.
@@ -46,6 +46,12 @@ pub trait Drawer {
             GridAffine2::translation(loc.min) * GridAffine2::scaling(loc.size()),
         );
     }
+}
+
+/// A two-dimensional [`Paint`] image.
+pub trait Image: Clone {
+    /// The size of this image.
+    fn size(&self) -> Vector2<u32>;
 }
 
 /// Identifies an opaque color.
@@ -82,6 +88,11 @@ impl Paint {
     /// Constructs a paint from the given sRGBA components.
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self([r, g, b, a])
+    }
+
+    /// A completely white [`Paint`].
+    pub const fn white() -> Self {
+        Self::new(255, 255, 255, 255)
     }
 
     /// Gets the red component of this [`Paint`].

@@ -403,6 +403,18 @@ pub struct WgpuImage<'a> {
     alloc: guillotiere::Allocation,
 }
 
+impl<'a> Clone for WgpuImage<'a> {
+    fn clone(&self) -> Self {
+        todo!()
+    }
+}
+
+impl<'a> Image for WgpuImage<'a> {
+    fn size(&self) -> Vector2<u32> {
+        vec2(self.alloc.rectangle.width() as u32, self.alloc.rectangle.height() as u32)
+    }
+}
+
 impl<'a> Drop for WgpuImage<'a> {
     fn drop(&mut self) {
         unsafe { (*self.atlas.allocator.as_ptr()).deallocate(self.alloc.id) }
