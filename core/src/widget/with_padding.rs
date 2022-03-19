@@ -86,6 +86,14 @@ impl<T: Widget, A: Dependent<T::State, Padding>> Widget for WithPaddingWidget<T,
     }
 }
 
+unsafe impl<'a, T: Lower<'a>, A: Lower<'a>> Lower<'a> for WithPaddingWidget<T, A>
+where
+    T::Target: Sized,
+    A::Target: Sized,
+{
+    type Target = WithPaddingWidget<T::Target, A::Target>;
+}
+
 /// An instance of a [`WithPaddingWidget`].
 pub struct WithPaddingWidgetInst<T: WidgetInst, A: Dependent<T::State, Padding>>(
     StateDerived<T::State, PaddingSizing<T, A>>,

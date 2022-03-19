@@ -327,8 +327,8 @@ impl<'a> WgpuTextureAtlas<'a> {
 impl<'a> Graphics for WgpuGraphics<'a> {
     type Image = WgpuImage<'a>;
     type Drawer<'b> = WgpuDrawer<'a>;
-    fn load_image(&self, source: image::DynamicImage) -> Self::Image {
-        self.image_atlas.alloc(source)
+    fn load_image(&self, source: image::DynamicImage) -> Image<Self> {
+        Image::new(self.image_atlas.alloc(source))
     }
 }
 
@@ -340,15 +340,15 @@ pub struct WgpuDrawer<'a> {
 }
 
 impl<'a> Drawer for WgpuDrawer<'a> {
-    type Image = WgpuImage<'a>;
+    type Graphics = WgpuGraphics<'a>;
 
-    fn load_image(&mut self, source: image::DynamicImage) -> Self::Image {
-        self.image_atlas.alloc(source)
+    fn context(&self) -> &Self::Graphics {
+        todo!()
     }
 
     fn draw_image(
         &mut self,
-        image: &Self::Image,
+        image: &Image<WgpuGraphics<'a>>,
         paint: Paint,
         src: Box2<i32>,
         trans: GridAffine2<i32>,
@@ -409,7 +409,7 @@ impl<'a> Clone for WgpuImage<'a> {
     }
 }
 
-impl<'a> Image for WgpuImage<'a> {
+impl<'a> ImageSize for WgpuImage<'a> {
     fn size(&self) -> Vector2<u32> {
         vec2(self.alloc.rectangle.width() as u32, self.alloc.rectangle.height() as u32)
     }

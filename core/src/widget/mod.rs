@@ -6,7 +6,7 @@ mod with_sizing;
 
 use crate::*;
 pub use fill::*;
-use fortify::Lower;
+use fortify::*;
 pub use self::image::*;
 pub use prepare::*;
 use std::borrow::Cow;
@@ -97,5 +97,21 @@ unsafe impl<'a, 'b, S: State + 'b, G: Graphics + 'b> Lower<'b> for dyn Element<G
         'b: 'c,
     {
         self
+    }
+}
+
+impl<T: Widget> Widget for Fortify<T> {
+    type State = T::State;
+    type Graphics = T::Graphics;
+    type Inst<'a>
+    where
+        Self::Graphics: 'a = T::Inst<'a>;
+
+    fn inst<'a>(
+        self,
+        s: &mut Self::State,
+        g: &'a Self::Graphics,
+    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst>::Key) {
+        todo!()
     }
 }

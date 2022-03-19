@@ -3,7 +3,7 @@ use crate::*;
 use std::marker::PhantomData;
 
 /// Constructs a [`Widget`] that displays a non-interactable [`State`]-dependent image.
-pub fn image<S: State, G: Graphics, A: Dependent<S, G::Image>>(image: A) -> ImageWidget<S, G, A> {
+pub fn image<S: State, G: Graphics, A: Dependent<S, Image<G>>>(image: A) -> ImageWidget<S, G, A> {
     ImageWidget {
         image,
         marker: PhantomData,
@@ -16,7 +16,7 @@ pub struct ImageWidget<S, G, A> {
     marker: PhantomData<fn(S, G)>,
 }
 
-impl<S: State, G: Graphics, A: Dependent<S, G::Image>> Widget for ImageWidget<S, G, A> {
+impl<S: State, G: Graphics, A: Dependent<S, Image<G>>> Widget for ImageWidget<S, G, A> {
     type State = S;
     type Graphics = G;
     type Inst<'a>
@@ -29,7 +29,7 @@ impl<S: State, G: Graphics, A: Dependent<S, G::Image>> Widget for ImageWidget<S,
     }
 }
 
-impl<S: State, G: Graphics, A: Dependent<S, G::Image>> WidgetInst for ImageWidget<S, G, A> {
+impl<S: State, G: Graphics, A: Dependent<S, Image<G>>> WidgetInst for ImageWidget<S, G, A> {
     type State = S;
     type Graphics = G;
     type Key = ();
@@ -55,12 +55,19 @@ impl<S: State, G: Graphics, A: Dependent<S, G::Image>> WidgetInst for ImageWidge
     }
 }
 
+unsafe impl<'a, S: 'a, G: 'a, A: Lower<'a>> Lower<'a> for ImageWidget<S, G, A>
+where
+    A::Target: Sized,
+{
+    type Target = ImageWidget<S, G, A::Target>;
+}
+
 pub struct ImageElement<'a, A, P: Placement> {
     image: &'a A,
     placement: P,
 }
 
-impl<'a, G: Graphics, P: Placement, A: Dependent<P::State, G::Image>> Element<G>
+impl<'a, G: Graphics, P: Placement, A: Dependent<P::State, Image<G>>> Element<G>
     for ImageElement<'a, A, P>
 {
     type State = P::State;

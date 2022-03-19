@@ -54,6 +54,14 @@ impl<T: Widget, A: Dependent<T::State, Sizing>> Widget for WithSizingWidget<T, A
     }
 }
 
+unsafe impl<'a, T: Lower<'a>, A: Lower<'a>> Lower<'a> for WithSizingWidget<T, A>
+where
+    T::Target: Sized,
+    A::Target: Sized,
+{
+    type Target = WithSizingWidget<T::Target, A::Target>;
+}
+
 /// An instance of a [`WithSizingWidget`].
 pub struct WithSizingWidgetInst<T: WidgetInst, A: Dependent<T::State, Sizing>>(
     StateDerived<T::State, IntersectSizing<T, A>>,

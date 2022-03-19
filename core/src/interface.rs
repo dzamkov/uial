@@ -59,10 +59,9 @@ impl<S: State> Interface<S> {
     }
 }
 
-impl<G: Graphics> Graphics for Interface<G> {
-    type Image = G::Image;
-    type Drawer<'a> = G::Drawer<'a>;
-    fn load_image(&self, data: image::DynamicImage) -> Self::Image {
+impl<G: Graphics> Interface<G> {
+    /// Calls [`Graphics::load_image`].
+    pub fn load_image(&self, data: image::DynamicImage) -> Image<G> {
         self.as_ref().load_image(data)
     }
 }
