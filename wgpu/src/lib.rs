@@ -3,7 +3,7 @@ mod graphics;
 
 use fortify::*;
 pub use graphics::*;
-use uial_core::widget::{Element, Placement, WidgetInst};
+use uial_core::widget::{Element, Placement, WidgetPlace};
 use uial_core::*;
 
 /// Creates an [`Application`] for the WebGPU platform.

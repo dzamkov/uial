@@ -16,22 +16,21 @@ pub struct ImageWidget<S, G, A> {
     marker: PhantomData<fn(S, G)>,
 }
 
-impl<S: State, G: Graphics, A: Dependent<S, Image<G>>> Widget for ImageWidget<S, G, A> {
+impl<S: State, G: Graphics, A: Dependent<S, Image<G>>> WidgetBase for ImageWidget<S, G, A> {
     type State = S;
     type Graphics = G;
-    type Inst<'a>
-    where
-        Self::Graphics: 'a,
-    = Self;
+}
 
+impl<'a, S: State, G: Graphics, A: Dependent<S, Image<G>>> WidgetInst<'a>
+    for ImageWidget<S, G, A>
+{
+    type Inst = Self;
     fn inst(self, _: &mut S, _: &G) -> (Self, ()) {
         (self, ())
     }
 }
 
-impl<S: State, G: Graphics, A: Dependent<S, Image<G>>> WidgetInst for ImageWidget<S, G, A> {
-    type State = S;
-    type Graphics = G;
+impl<S: State, G: Graphics, A: Dependent<S, Image<G>>> WidgetPlace for ImageWidget<S, G, A> {
     type Key = ();
     type Elem<'a, P: Placement<State = Self::State>>
     where

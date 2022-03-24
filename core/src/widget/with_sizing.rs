@@ -34,19 +34,21 @@ pub struct WithSizingWidget<T, A> {
     sizing: A,
 }
 
-impl<T: Widget, A: Dependent<T::State, Sizing>> Widget for WithSizingWidget<T, A> {
+impl<T: WidgetBase, A: Dependent<T::State, Sizing>> WidgetBase for WithSizingWidget<T, A> {
     type State = T::State;
     type Graphics = T::Graphics;
-    type Inst<'a>
-    where
-        T::Graphics: 'a,
-    = WithSizingWidgetInst<T::Inst<'a>, A>;
+}
 
-    fn inst<'a>(
+impl<'a, T: WidgetInst<'a>, A: Dependent<T::State, Sizing>> WidgetInst<'a>
+    for WithSizingWidget<T, A>
+{
+    type Inst = WithSizingWidgetInst<T::Inst, A>;
+
+    fn inst(
         self,
         s: &mut T::State,
         g: &'a T::Graphics,
-    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst>::Key) {
+    ) -> (Self::Inst, <Self::Inst as WidgetPlace>::Key) {
         let (source, key) = self.source.inst(s, g);
         let sizing = self.sizing;
         let inst = WithSizingWidgetInst(StateDerived::new(IntersectSizing { source, sizing }));
@@ -63,7 +65,7 @@ where
 }
 
 /// An instance of a [`WithSizingWidget`].
-pub struct WithSizingWidgetInst<T: WidgetInst, A: Dependent<T::State, Sizing>>(
+pub struct WithSizingWidgetInst<T: WidgetPlace, A: Dependent<T::State, Sizing>>(
     StateDerived<T::State, IntersectSizing<T, A>>,
 );
 
@@ -72,7 +74,7 @@ struct IntersectSizing<T, A> {
     sizing: A,
 }
 
-impl<T: WidgetInst, A: Dependent<T::State, Sizing>> DerivedFn<T::State> for IntersectSizing<T, A> {
+impl<T: WidgetPlace, A: Dependent<T::State, Sizing>> DerivedFn<T::State> for IntersectSizing<T, A> {
     type Target = Sizing;
     fn eval(&self, s: &T::State) -> Self::Target {
         let a = &*self.source.sizing(s);
@@ -81,9 +83,12 @@ impl<T: WidgetInst, A: Dependent<T::State, Sizing>> DerivedFn<T::State> for Inte
     }
 }
 
-impl<T: WidgetInst, A: Dependent<T::State, Sizing>> WidgetInst for WithSizingWidgetInst<T, A> {
+impl<T: WidgetPlace, A: Dependent<T::State, Sizing>> WidgetBase for WithSizingWidgetInst<T, A> {
     type State = T::State;
     type Graphics = T::Graphics;
+}
+
+impl<T: WidgetPlace, A: Dependent<T::State, Sizing>> WidgetPlace for WithSizingWidgetInst<T, A> {
     type Key = T::Key;
     type Elem<'a, P: Placement<State = T::State>>
     where

@@ -18,22 +18,19 @@ pub struct FillWidget<S: State, G: Graphics> {
     marker: PhantomData<fn(S, G)>,
 }
 
-impl<S: State, G: Graphics> Widget for FillWidget<S, G> {
+impl<S: State, G: Graphics> WidgetBase for FillWidget<S, G> {
     type State = S;
     type Graphics = G;
-    type Inst<'a>
-    where
-        G: 'a,
-    = Self;
+}
 
+impl<'a, S: State, G: Graphics> WidgetInst<'a> for FillWidget<S, G> {
+    type Inst = Self;
     fn inst(self, _: &mut S, _: &G) -> (Self, ()) {
         (self, ())
     }
 }
 
-impl<S: State, G: Graphics> WidgetInst for FillWidget<S, G> {
-    type State = S;
-    type Graphics = G;
+impl<S: State, G: Graphics> WidgetPlace for FillWidget<S, G> {
     type Key = ();
     type Elem<'a, P: Placement<State = S>>
     where

@@ -66,19 +66,21 @@ pub struct WithPaddingWidget<T, A> {
     padding: A,
 }
 
-impl<T: Widget, A: Dependent<T::State, Padding>> Widget for WithPaddingWidget<T, A> {
+impl<T: WidgetBase, A: Dependent<T::State, Padding>> WidgetBase for WithPaddingWidget<T, A> {
     type State = T::State;
     type Graphics = T::Graphics;
-    type Inst<'a>
-    where
-        T::Graphics: 'a,
-    = WithPaddingWidgetInst<T::Inst<'a>, A>;
+}
 
-    fn inst<'a>(
+impl<'a, T: WidgetInst<'a>, A: Dependent<T::State, Padding>> WidgetInst<'a>
+    for WithPaddingWidget<T, A>
+{
+    type Inst = WithPaddingWidgetInst<T::Inst, A>;
+
+    fn inst(
         self,
         s: &mut T::State,
         g: &'a T::Graphics,
-    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst>::Key) {
+    ) -> (Self::Inst, <Self::Inst as WidgetPlace>::Key) {
         let (source, key) = self.source.inst(s, g);
         let padding = self.padding;
         let inst = WithPaddingWidgetInst(StateDerived::new(PaddingSizing { source, padding }));
@@ -95,7 +97,7 @@ where
 }
 
 /// An instance of a [`WithPaddingWidget`].
-pub struct WithPaddingWidgetInst<T: WidgetInst, A: Dependent<T::State, Padding>>(
+pub struct WithPaddingWidgetInst<T: WidgetPlace, A: Dependent<T::State, Padding>>(
     StateDerived<T::State, PaddingSizing<T, A>>,
 );
 
@@ -104,7 +106,7 @@ struct PaddingSizing<T, A> {
     padding: A,
 }
 
-impl<T: WidgetInst, A: Dependent<T::State, Padding>> DerivedFn<T::State> for PaddingSizing<T, A> {
+impl<T: WidgetPlace, A: Dependent<T::State, Padding>> DerivedFn<T::State> for PaddingSizing<T, A> {
     type Target = Sizing;
     fn eval<'a>(&'a self, s: &'a T::State) -> Self::Target {
         let sizing = &*self.source.sizing(s);
@@ -118,9 +120,12 @@ impl<T: WidgetInst, A: Dependent<T::State, Padding>> DerivedFn<T::State> for Pad
     }
 }
 
-impl<T: WidgetInst, A: Dependent<T::State, Padding>> WidgetInst for WithPaddingWidgetInst<T, A> {
+impl<T: WidgetPlace, A: Dependent<T::State, Padding>> WidgetBase for WithPaddingWidgetInst<T, A> {
     type State = T::State;
     type Graphics = T::Graphics;
+}
+
+impl<T: WidgetPlace, A: Dependent<T::State, Padding>> WidgetPlace for WithPaddingWidgetInst<T, A> {
     type Key = T::Key;
     type Elem<'a, P: Placement<State = T::State>>
     where
@@ -153,12 +158,12 @@ impl<T: WidgetInst, A: Dependent<T::State, Padding>> WidgetInst for WithPaddingW
 /// The placement for an inner [`Widget`] inside a [`WithPaddingWidget`].
 pub struct WithPaddingPlacement<
     'a,
-    T: WidgetInst,
+    T: WidgetPlace,
     A: Dependent<T::State, Padding>,
     P: Placement<State = T::State>,
 >(StateDerived<T::State, PaddingRect<'a, T, A, P>>);
 
-impl<'a, T: WidgetInst, A: Dependent<T::State, Padding>, P: Placement<State = T::State>> Placement
+impl<'a, T: WidgetPlace, A: Dependent<T::State, Padding>, P: Placement<State = T::State>> Placement
     for WithPaddingPlacement<'a, T, A, P>
 {
     type State = T::State;
@@ -169,7 +174,7 @@ impl<'a, T: WidgetInst, A: Dependent<T::State, Padding>, P: Placement<State = T:
 
 struct PaddingRect<
     'a,
-    T: WidgetInst,
+    T: WidgetPlace,
     A: Dependent<T::State, Padding>,
     P: Placement<State = T::State>,
 > {
@@ -178,7 +183,7 @@ struct PaddingRect<
     placement: P,
 }
 
-impl<'a, T: WidgetInst, A: Dependent<T::State, Padding>, P: Placement<State = T::State>>
+impl<'a, T: WidgetPlace, A: Dependent<T::State, Padding>, P: Placement<State = T::State>>
     DerivedFn<T::State> for PaddingRect<'a, T, A, P>
 {
     type Target = Box2<i32>;

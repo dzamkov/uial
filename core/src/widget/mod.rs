@@ -4,10 +4,10 @@ mod prepare;
 mod with_padding;
 mod with_sizing;
 
+pub use self::image::*;
 use crate::*;
 pub use fill::*;
 use fortify::*;
-pub use self::image::*;
 pub use prepare::*;
 use std::borrow::Cow;
 pub use with_padding::*;
@@ -16,37 +16,34 @@ pub use with_sizing::*;
 /// A static description of a rectangular GUI element whose size and location has not yet been
 /// determined. A widget may have size constraints and preferences that affect how it is used in
 /// a layout.
-pub trait Widget {
+pub trait Widget: for<'a> WidgetInst<'a> {}
+
+/// Encapsulates the basic information for a [`Widget`] in any phase of use.
+pub trait WidgetBase {
     /// The type of [`State`] the widget interacts with.
     type State: State;
 
     /// The type of graphics context used by the widget.
     type Graphics: Graphics;
+}
 
+/// A [`Widget`] which can be instantiated in a context of lifetime `'a`.
+pub trait WidgetInst<'a>: WidgetBase {
     /// The type of [`WidgetInst`] that results from instantiating this widget.
-    type Inst<'a>: WidgetInst<State = Self::State, Graphics = Self::Graphics>
-    where
-        Self::Graphics: 'a;
+    type Inst: WidgetPlace<State = Self::State, Graphics = Self::Graphics>;
 
     /// Instantiates this [`Widget`], providing it with the specific [`State`] and [`Graphics`] it
     /// will be using. This is an opportunity for the [`Widget`] to initialize state and
     /// prepare graphics resources.
-    fn inst<'a>(
+    fn inst(
         self,
         s: &mut Self::State,
         g: &'a Self::Graphics,
-    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst>::Key);
+    ) -> (Self::Inst, <Self::Inst as WidgetPlace>::Key);
 }
 
-/// A [`Widget`] that has been instantiated with a [`State`] and [`Graphics`], and is now
-/// ready to be placed.
-pub trait WidgetInst {
-    /// The type of [`State`] the widget interacts with.
-    type State: State;
-
-    /// The type of graphics context used by the widget.
-    type Graphics: Graphics;
-
+/// A [`Widget`] that is ready to be placed.
+pub trait WidgetPlace: WidgetBase {
     /// The information needed to place this [`Widget`]. Typically, there can be at most one
     /// `Key` per widget, preventing it from being placed multiple times.
     type Key;
@@ -89,6 +86,8 @@ pub trait Element<G: Graphics> {
     fn draw_to(&self, s: &Self::State, drawer: &mut G::Drawer<'_>);
 }
 
+impl<T: for<'a> WidgetInst<'a>> Widget for T {}
+
 unsafe impl<'a, 'b, S: State + 'b, G: Graphics + 'b> Lower<'b> for dyn Element<G, State = S> + 'a {
     type Target = dyn Element<G, State = S> + 'b;
     fn lower_ref<'c>(&'c self) -> &'c Self::Target
@@ -97,21 +96,5 @@ unsafe impl<'a, 'b, S: State + 'b, G: Graphics + 'b> Lower<'b> for dyn Element<G
         'b: 'c,
     {
         self
-    }
-}
-
-impl<T: Widget> Widget for Fortify<T> {
-    type State = T::State;
-    type Graphics = T::Graphics;
-    type Inst<'a>
-    where
-        Self::Graphics: 'a = T::Inst<'a>;
-
-    fn inst<'a>(
-        self,
-        s: &mut Self::State,
-        g: &'a Self::Graphics,
-    ) -> (Self::Inst<'a>, <Self::Inst<'a> as WidgetInst>::Key) {
-        todo!()
     }
 }
