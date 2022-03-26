@@ -98,3 +98,58 @@ unsafe impl<'a, 'b, S: State + 'b, G: Graphics + 'b> Lower<'b> for dyn Element<G
         self
     }
 }
+
+impl<T: WidgetBase> WidgetBase for Fortify<T> {
+    type State = T::State;
+    type Graphics = T::Graphics;
+}
+
+impl<'a, 'b, T: WidgetInst<'a>> WidgetInst<'a> for Fortify<T>
+where
+    T: 'b,
+    T::Inst: Refers<'b>,
+    for<'c> T: Lower<'c>,
+    for<'c> <T as Lower<'c>>::Target: Sized + WidgetInst<'a>,
+    for<'c> <T as Lower<'c>>::Target: WidgetBase<State = T::State, Graphics = T::Graphics>,
+    for<'c> T::Inst: Lower<'c, Target = <<T as Lower<'c>>::Target as WidgetInst<'a>>::Inst>,
+    for<'c> <<T as Lower<'c>>::Target as WidgetInst<'a>>::Inst:
+        WidgetPlace<Key = <T::Inst as WidgetPlace>::Key>,
+{
+    type Inst = Fortify<T::Inst>;
+    fn inst(
+        self,
+        s: &mut Self::State,
+        g: &'a Self::Graphics,
+    ) -> (Self::Inst, <T::Inst as WidgetPlace>::Key) {
+        self.split(|source| {
+            let (inst, key) = Lowered::unwrap(source).inst(s, g);
+            (Lowered::new_direct(inst), key)
+        })
+    }
+}
+
+impl<T: WidgetPlace> WidgetPlace for Fortify<T>
+where
+    for<'a> T: Lower<'a>,
+    for<'a> <T as Lower<'a>>::Target: WidgetPlace<Key = T::Key>,
+    for<'a> <T as Lower<'a>>::Target: WidgetBase<State = T::State, Graphics = T::Graphics>
+{
+    type Key = T::Key;
+    type Elem<'a, P: Placement<State = Self::State>>
+    where
+        Self: 'a,
+    = <<T as Lower<'a>>::Target as WidgetPlace>::Elem<'a, P>;
+
+    fn sizing<'a>(&'a self, s: &'a Self::State) -> Cow<'a, Sizing> {
+        self.borrow().sizing(s)
+    }
+
+    fn place<'a, P: Placement<State = Self::State>>(
+        &'a self,
+        s: &mut Self::State,
+        key: Self::Key,
+        placement: P,
+    ) -> Self::Elem<'a, P> {
+        self.borrow().place(s, key, placement)
+    }
+}

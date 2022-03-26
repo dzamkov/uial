@@ -155,6 +155,16 @@ impl<T: WidgetPlace, A: Dependent<T::State, Padding>> WidgetPlace for WithPaddin
     }
 }
 
+unsafe impl<'a, T: Lower<'a>, A: Lower<'a>> Lower<'a> for WithPaddingWidgetInst<T, A>
+where
+    T: WidgetPlace,
+    A: Dependent<T::State, Padding>,
+    T::Target: Sized + WidgetBase<State = T::State> + WidgetPlace,
+    A::Target: Sized + Dependent<T::State, Padding>,
+{
+    type Target = WithPaddingWidgetInst<T::Target, A::Target>;
+}
+
 /// The placement for an inner [`Widget`] inside a [`WithPaddingWidget`].
 pub struct WithPaddingPlacement<
     'a,

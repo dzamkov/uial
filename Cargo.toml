@@ -12,5 +12,5 @@ members = [
 [dependencies]
 uial-core = { path = "core" }
 uial-wgpu = { path = "wgpu" }
-fortify = "0.3.1"
+fortify = "0.4.0"
 image = "0.23.14"
