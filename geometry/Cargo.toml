@@ -1,0 +1,10 @@
+[package]
+name = "uial-geometry"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+derive_more = "0.99.17"
+thiserror = "1.0.40"
+approx = "0.5.1"
+num-rational = { version = "0.4.1", default-features = false }

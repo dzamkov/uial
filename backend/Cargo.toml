@@ -1,0 +1,15 @@
+[package]
+name = "uial-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uial = { path = "../core" }
+env_logger = "0.10.0"
+pollster = "0.3.0"
+wgpu = "0.16.0"
+winit = "0.28.3"
+bytemuck = { version = "1.13.1", features = ["derive"] }
+palette ={ version = "0.7.1", features = ["bytemuck"] }
+image = "0.24.6"
+guillotiere = "0.6.2"
