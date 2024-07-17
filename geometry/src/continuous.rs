@@ -1,4 +1,5 @@
 use derive_more::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use bytemuck::{Pod, Zeroable};
 
 /// The scalar type used for continuous geometry.
 pub type Scalar = f32;
@@ -22,6 +23,8 @@ pub const PI: Scalar = std::f32::consts::PI;
     SubAssign,
     Div,
     DivAssign,
+    Pod,
+    Zeroable
 )]
 pub struct Vector2 {
     pub x: Scalar,
@@ -197,6 +200,7 @@ impl Box2 {
 }
 
 /// A 2x2 matrix, describing a linear transformation in two-dimensional space.
+#[repr(C)]
 #[derive(
     PartialEq,
     Copy,
@@ -211,6 +215,8 @@ impl Box2 {
     SubAssign,
     Div,
     DivAssign,
+    Pod,
+    Zeroable
 )]
 pub struct Matrix2 {
     pub x: Vector2,

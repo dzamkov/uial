@@ -6,10 +6,10 @@ pub use self::erase::*;
 pub use self::image::*;
 pub use self::quad::*;
 use ::wgpu;
-use uial::drawer::*;
-use uial::geometry::*;
 use bytemuck::{Pod, Zeroable};
 use std::{borrow::Cow, ops::Range, rc::Rc};
+use uial::drawer::*;
+use uial::geometry::*;
 use wgpu::util::DeviceExt;
 
 /// An "environment" which provides a [`WgpuContext`].
@@ -226,7 +226,6 @@ impl<'a> WgpuDrawerContext<'a> {
         let white_image = self.white_image.view_all();
         let white_uv = (white_image.rect().min.into_float() + vec2(0.5, 0.5))
             / white_image.store().texture_size as Scalar;
-        let white_uv = white_uv.into();
 
         // Begin render pass
         let vertex_buffer;
@@ -453,7 +452,7 @@ pub struct WgpuDrawer<'pass> {
     rpass: wgpu::RenderPass<'pass>,
     holdings: &'pass mut Vec<Rc<dyn Something + 'pass>>,
     next_layer: u32,
-    white_uv: [f32; 2],
+    white_uv: Vector2,
     verts: Vec<DrawVertex>,
     opaque_lines: Vec<u32>,
     opaque_tris: Vec<u32>,
@@ -569,7 +568,7 @@ impl VectorDrawer for WgpuDrawer<'_> {
         let paint: palette::Srgba<u8> = paint.into();
         let (verts, lines) = self.verts_lines_mut(paint.alpha == 255);
         verts.push(DrawVertex {
-            pos: start.into(),
+            pos: start,
             layer,
             uv: white_uv,
             paint,
@@ -620,27 +619,25 @@ impl RasterDrawer for WgpuDrawer<'_> {
         let (verts, tris) = self.verts_tris_mut(paint.alpha == 255);
         let base_index = verts.len() as u32;
         verts.push(DrawVertex {
-            pos: vec2i(rect.min.x, rect.min.y).into_float().into(),
+            pos: vec2i(rect.min.x, rect.min.y).into_float(),
             layer,
             uv: white_uv,
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(rect.max_exclusive.x, rect.min.y).into_float().into(),
+            pos: vec2i(rect.max_exclusive.x, rect.min.y).into_float(),
             layer,
             uv: white_uv,
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(rect.min.x, rect.max_exclusive.y).into_float().into(),
+            pos: vec2i(rect.min.x, rect.max_exclusive.y).into_float(),
             layer,
             uv: white_uv,
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(rect.max_exclusive.x, rect.max_exclusive.y)
-                .into_float()
-                .into(),
+            pos: vec2i(rect.max_exclusive.x, rect.max_exclusive.y).into_float(),
             layer,
             uv: white_uv,
             paint,
@@ -672,27 +669,27 @@ impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuDrawer<'_> {
         let uv_min = image.rect().min.into_float() * uv_scale;
         let uv_max = uv_min + image.rect().size().into_vec().into_float() * uv_scale;
         verts.push(DrawVertex {
-            pos: vec2i(pos_min.x, pos_max.y).into_float().into(),
+            pos: vec2i(pos_min.x, pos_max.y).into_float(),
             layer,
-            uv: vec2(uv_min.x, uv_min.y).into(),
+            uv: vec2(uv_min.x, uv_min.y),
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(pos_max.x, pos_max.y).into_float().into(),
+            pos: vec2i(pos_max.x, pos_max.y).into_float(),
             layer,
-            uv: vec2(uv_max.x, uv_min.y).into(),
+            uv: vec2(uv_max.x, uv_min.y),
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(pos_min.x, pos_min.y).into_float().into(),
+            pos: vec2i(pos_min.x, pos_min.y).into_float(),
             layer,
-            uv: vec2(uv_min.x, uv_max.y).into(),
+            uv: vec2(uv_min.x, uv_max.y),
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(pos_max.x, pos_min.y).into_float().into(),
+            pos: vec2i(pos_max.x, pos_min.y).into_float(),
             layer,
-            uv: vec2(uv_max.x, uv_max.y).into(),
+            uv: vec2(uv_max.x, uv_max.y),
             paint,
         });
         tris.push(base_index + 0);
@@ -709,19 +706,19 @@ pub struct WgpuPolylineDrawer<'a> {
     verts: &'a mut Vec<DrawVertex>,
     lines: &'a mut Vec<u32>,
     layer: u32,
-    uv: [f32; 2],
+    uv: Vector2,
     paint: palette::Srgba<u8>,
 }
 
 impl PolylineBuilder for WgpuPolylineDrawer<'_> {
     fn prev(&self) -> Vector2 {
-        self.verts.last().unwrap().pos.into()
+        self.verts.last().unwrap().pos
     }
 
     fn line_to(&mut self, point: Vector2) {
         let index = self.verts.len() as u32;
         self.verts.push(DrawVertex {
-            pos: point.into(),
+            pos: point,
             layer: self.layer,
             uv: self.uv,
             paint: self.paint,
@@ -738,7 +735,7 @@ pub struct WgpuPolylineFiller<'a> {
     start_index: u32,
     prev: Vector2,
     layer: u32,
-    uv: [f32; 2],
+    uv: Vector2,
     paint: palette::Srgba<u8>,
 }
 
@@ -750,7 +747,7 @@ impl PolylineBuilder for WgpuPolylineFiller<'_> {
     fn line_to(&mut self, point: Vector2) {
         self.prev = point;
         self.verts.push(DrawVertex {
-            pos: point.into(),
+            pos: point,
             layer: self.layer,
             uv: self.uv,
             paint: self.paint,
@@ -782,9 +779,9 @@ pub trait Vertex: Copy + bytemuck::Pod {
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct DrawVertex {
-    pub pos: [f32; 2],
+    pub pos: Vector2,
     pub layer: u32,
-    pub uv: [f32; 2],
+    pub uv: Vector2,
     pub paint: palette::Srgba<u8>,
 }
 

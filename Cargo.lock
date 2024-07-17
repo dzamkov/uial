@@ -1747,6 +1747,7 @@ name = "uial-geometry"
 version = "0.1.0"
 dependencies = [
  "approx",
+ "bytemuck",
  "derive_more",
  "num-rational",
  "thiserror",
