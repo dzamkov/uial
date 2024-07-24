@@ -64,44 +64,9 @@ impl<T, const VERTICAL: bool> Extend<T, VERTICAL> {
     }
 }
 
-/// The layout for an [`Extend`] widget.
-pub struct ExtendLayout<T: WidgetLayout + ?Sized> {
-    pub before_padding: u32,
-    pub after_padding: u32,
-    pub inner: T::Owned,
-}
+impl<T: WidgetBase, const VERTICAL: bool> WidgetBase for Extend<T, VERTICAL> {}
 
-impl<T: WidgetBase, const VERTICAL: bool> WidgetBase for Extend<T, VERTICAL> {
-    type Layout = ExtendLayout<T::Layout>;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        let mut size = self.inner.size(layout.inner.borrow());
-        let padding = layout.before_padding + layout.after_padding;
-        if VERTICAL {
-            size.y += padding;
-        } else {
-            size.x += padding;
-        }
-        size
-    }
-}
-
-impl<T: WidgetBase, const VERTICAL: bool> WidgetInner for Extend<T, VERTICAL> {
-    type Inner = T;
-    fn inner<'a, 'b>(inst: WidgetInst<'a, 'b, Self>) -> WidgetInst<'a, 'b, Self::Inner> {
-        WidgetInst {
-            widget: &inst.widget.inner,
-            min: inst.min
-                + if VERTICAL {
-                    vec2i(0, inst.layout.before_padding as i32)
-                } else {
-                    vec2i(inst.layout.before_padding as i32, 0)
-                },
-            layout: inst.layout.inner.borrow(),
-        }
-    }
-}
-
-impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, const VERTICAL: bool> Widget<Env>
+impl<Env: WidgetEnvironment + Track + ?Sized, T: Widget<Env>, const VERTICAL: bool> Widget<Env>
     for Extend<T, VERTICAL>
 {
     fn sizing(&self, env: &Env) -> Sizing {
@@ -113,95 +78,110 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, const VERTICAL: bool> Widg
         }
     }
 
-    fn layout(&self, env: &Env, size: Size2i) -> ExtendLayout<T::Layout> {
-        if VERTICAL {
-            let inner_size_y = self.inner.sizing(env).upto_y(size.x, size.y);
-            let inner_size_y = inner_size_y.expect("invalid size");
-            let padding = size.y - inner_size_y;
-            let before_padding = mul_rational(self.align, padding);
-            let after_padding = padding - before_padding;
-            ExtendLayout {
-                before_padding,
-                after_padding,
-                inner: self.inner.layout(env, size2i(size.x, inner_size_y)),
-            }
-        } else {
-            let inner_size_x = self.inner.sizing(env).upto_x(size.x, size.y);
-            let inner_size_x = inner_size_x.expect("invalid size");
-            let padding = size.x - inner_size_x;
-            let before_padding = mul_rational(self.align, padding);
-            let after_padding = padding - before_padding;
-            ExtendLayout {
-                before_padding,
-                after_padding,
-                inner: self.inner.layout(env, size2i(inner_size_x, size.y)),
-            }
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        self.inner.inst(
+            env,
+            ExtendSlot {
+                widget: self,
+                layout_cache: Cache::new(),
+                source: slot,
+            },
+        )
+    }
+}
+
+/// A [`WidgetSlot`] provided by an [`Extend`] widget to its inner widget.
+struct ExtendSlot<'a, Env: Track + ?Sized, T, S, const VERTICAL: bool> {
+    widget: &'a Extend<T, VERTICAL>,
+    layout_cache: Cache<Env, ExtendLayout>,
+    source: S,
+}
+
+impl<Env: Track + ?Sized, T, S: Clone, const VERTICAL: bool> Clone
+    for ExtendSlot<'_, Env, T, S, VERTICAL>
+{
+    fn clone(&self) -> Self {
+        Self {
+            widget: self.widget,
+            layout_cache: Cache::new(),
+            source: self.source.clone(),
         }
     }
+}
 
-    fn relayout(&self, layout: &mut ExtendLayout<T::Layout>, env: &Env, size: Size2i) {
-        if VERTICAL {
-            let inner_size_y = self.inner.sizing(env).upto_y(size.x, size.y);
-            let inner_size_y = inner_size_y.expect("invalid size");
-            let padding = size.y - inner_size_y;
-            layout.before_padding = mul_rational(self.align, padding);
-            layout.after_padding = padding - layout.before_padding;
-            self.inner.relayout(layout.inner.borrow_mut(), env, size2i(size.x, inner_size_y));
-        } else {
-            let inner_size_x = self.inner.sizing(env).upto_x(size.x, size.y);
-            let inner_size_x = inner_size_x.expect("invalid size");
-            let padding = size.x - inner_size_x;
-            layout.before_padding = mul_rational(self.align, padding);
-            layout.after_padding = padding - layout.before_padding;
-            self.inner.relayout(layout.inner.borrow_mut(), env, size2i(inner_size_x, size.y));
-        }
+/// Describes the internal layout of an [`Extend`] widget instance.
+#[derive(Clone, Copy)]
+struct ExtendLayout {
+    before_padding: u32,
+    inner_size: Size2i,
+}
+
+impl<
+        Env: WidgetEnvironment + Track + ?Sized,
+        T: Widget<Env>,
+        S: WidgetSlot<Env>,
+        const VERTICAL: bool,
+    > ExtendSlot<'_, Env, T, S, VERTICAL>
+{
+    /// Gets the internal layout associated with this slot.
+    pub fn layout(&self, env: &Env) -> ExtendLayout {
+        self.layout_cache.get(env, |env, _| {
+            let inner_sizing = self.widget.inner.sizing(env);
+            let align = self.widget.align;
+            let size = self.source.size(env);
+            if VERTICAL {
+                let inner_size_y = inner_sizing.upto_y(size.x, size.y);
+                let inner_size_y = inner_size_y.expect("invalid size");
+                let padding = size.y - inner_size_y;
+                let before_padding = mul_rational(align, padding);
+                ExtendLayout {
+                    before_padding,
+                    inner_size: size2i(size.x, inner_size_y),
+                }
+            } else {
+                let inner_size_x = inner_sizing.upto_x(size.x, size.y);
+                let inner_size_x = inner_size_x.expect("invalid size");
+                let padding = size.x - inner_size_x;
+                let before_padding = mul_rational(align, padding);
+                ExtendLayout {
+                    before_padding,
+                    inner_size: size2i(inner_size_x, size.y),
+                }
+            }
+        })
+    }
+}
+
+impl<
+        Env: WidgetEnvironment + Track + ?Sized,
+        T: Widget<Env>,
+        S: WidgetSlot<Env>,
+        const VERTICAL: bool,
+    > WidgetSlot<Env> for ExtendSlot<'_, Env, T, S, VERTICAL>
+{
+    fn is_visible(&self, env: &Env) -> bool {
+        self.source.is_visible(env)
     }
 
-    fn outline<'a>(
-        inst: WidgetInst<'a, 'a, Self>,
-        outliner: &mut (impl WidgetOutliner<'a, Env> + ?Sized),
-    ) {
-        inst.inner().outline(outliner)
+    fn size(&self, env: &Env) -> Size2i {
+        self.layout(env).inner_size
     }
 
-    fn draw(inst: WidgetInst<Self>, env: &Env, drawer: &mut Env::Drawer) {
-        inst.inner().draw(env, drawer)
+    fn min(&self, env: &Env) -> Point2i {
+        let before_padding = self.layout(env).before_padding;
+        self.source.min(env)
+            + if VERTICAL {
+                vec2i(0, before_padding as i32)
+            } else {
+                vec2i(before_padding as i32, 0)
+            }
     }
 
-    fn hover_interactions<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        f: &mut impl FnMut(&dyn Interaction),
-    ) -> EventStatus {
-        inst.inner().hover_interactions(env, cursor, f)
-    }
-
-    fn mouse_scroll<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        amount: ScrollAmount,
-    ) -> EventStatus {
-        inst.inner().mouse_scroll(env, cursor, amount)
-    }
-
-    fn mouse_down<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        button: MouseButton,
-    ) -> EventStatus {
-        inst.inner().mouse_down(env, cursor, button)
-    }
-
-    fn focus<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        keyboard: impl Keyboard<'a, Env> + Clone,
-        backward: bool,
-    ) -> EventStatus {
-        inst.inner().focus(env, keyboard, backward)
+    fn bubble_general_event(&self, env: &mut Env, event: GeneralEvent) {
+        self.source.bubble_general_event(env, event)
     }
 }
 

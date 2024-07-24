@@ -23,23 +23,7 @@ impl<T> Pad<T> {
     }
 }
 
-impl<T: WidgetBase> WidgetBase for Pad<T> {
-    type Layout = T::Layout;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        self.inner.size(layout) + self.amount.size()
-    }
-}
-
-impl<T: WidgetBase> WidgetInner for Pad<T> {
-    type Inner = T;
-    fn inner<'a, 'b>(inst: WidgetInst<'a, 'b, Self>) -> WidgetInst<'a, 'b, Self::Inner> {
-        WidgetInst {
-            widget: &inst.widget.inner,
-            min: inst.min + vec2i(inst.widget.amount.n_x as i32, inst.widget.amount.n_y as i32),
-            layout: inst.layout,
-        }
-    }
-}
+impl<T: WidgetBase> WidgetBase for Pad<T> {}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>> Widget<Env> for Pad<T> {
     fn sizing(&self, env: &Env) -> Sizing {
@@ -48,58 +32,43 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>> Widget<Env> for Pad<T> {
         res
     }
 
-    fn layout(&self, env: &Env, size: Size2i) -> <T::Layout as WidgetLayout>::Owned {
-        self.inner.layout(env, size - self.amount.size())
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        self.inner.inst(
+            env,
+            PadSlot {
+                padding: &self.amount,
+                source: slot,
+            },
+        )
+    }
+}
+
+/// A [`WidgetSlot`] provided by a [`Pad`] widget to its inner widget.
+#[derive(Clone)]
+struct PadSlot<'a, S> {
+    padding: &'a Padding2i,
+    source: S,
+}
+
+impl<Env: WidgetEnvironment + ?Sized, S: WidgetSlot<Env>> WidgetSlot<Env> for PadSlot<'_, S> {
+    fn is_visible(&self, env: &Env) -> bool {
+        self.source.is_visible(env)
     }
 
-    fn relayout(&self, layout: &mut T::Layout, env: &Env, size: Size2i) {
-        self.inner.relayout(layout, env, size - self.amount.size())
+    fn size(&self, env: &Env) -> Size2i {
+        self.source.size(env) - self.padding.size()
     }
 
-    fn outline<'a>(
-        inst: WidgetInst<'a, 'a, Self>,
-        outliner: &mut (impl WidgetOutliner<'a, Env> + ?Sized),
-    ) {
-        inst.inner().outline(outliner)
+    fn min(&self, env: &Env) -> Point2i {
+        self.source.min(env) + vec2i(self.padding.n_x as i32, self.padding.n_y as i32)
     }
 
-    fn draw(inst: WidgetInst<Self>, env: &Env, drawer: &mut Env::Drawer) {
-        inst.inner().draw(env, drawer)
-    }
+    // TODO: Implement `bounds`
 
-    fn hover_interactions<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        f: &mut impl FnMut(&dyn Interaction),
-    ) -> EventStatus {
-        inst.inner().hover_interactions(env, cursor, f)
-    }
-
-    fn mouse_scroll<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        amount: ScrollAmount,
-    ) -> EventStatus {
-        inst.inner().mouse_scroll(env, cursor, amount)
-    }
-
-    fn mouse_down<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        button: MouseButton,
-    ) -> EventStatus {
-        inst.inner().mouse_down(env, cursor, button)
-    }
-
-    fn focus<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        keyboard: impl Keyboard<'a, Env> + Clone,
-        backward: bool,
-    ) -> EventStatus {
-        inst.inner().focus(env, keyboard, backward)
+    fn bubble_general_event(&self, env: &mut Env, event: GeneralEvent) {
+        self.source.bubble_general_event(env, event)
     }
 }

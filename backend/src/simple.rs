@@ -1,6 +1,7 @@
 use super::*;
-use uial::widget::DynWidget;
-use uial::{Duration, Clock, DefaultReact};
+use std::rc::Rc;
+use uial::widget::{DynWidget, Widget};
+use uial::{Clock, DefaultReact, Duration};
 
 /// The state type for a [`SimpleApplication`].
 pub type SimpleState = (DefaultReact, Clock);
@@ -8,7 +9,7 @@ pub type SimpleState = (DefaultReact, Clock);
 /// An [`Application`] defined by a static title and body constructor.
 pub struct SimpleApplication {
     pub title: &'static str,
-    pub body: &'static dyn Fn(&RunEnv<SimpleState>) -> Box<DynWidget<'static, RunEnv<SimpleState>>>,
+    pub body: &'static dyn Fn(&RunEnv<SimpleState>) -> Rc<DynWidget<'static, RunEnv<SimpleState>>>,
 }
 
 impl Application for SimpleApplication {
@@ -18,7 +19,7 @@ impl Application for SimpleApplication {
         self.title
     }
 
-    fn body(&self, env: &RunEnv<SimpleState>) -> Box<DynWidget<'_, RunEnv<Self::State>>> {
+    fn body(&self, env: &RunEnv<SimpleState>) -> impl Widget<RunEnv<SimpleState>> + '_ {
         (self.body)(env)
     }
 

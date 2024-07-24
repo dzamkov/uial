@@ -10,28 +10,34 @@ pub fn empty() -> Empty {
     Empty
 }
 
-impl WidgetBase for Empty {
-    type Layout = Size2i;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        *layout
-    }
-}
-
-impl<Env: WidgetEnvironment + ?Sized> Widget<Env> for Empty
-{
+impl<Env: WidgetEnvironment + ?Sized> Widget<Env> for Empty {
     fn sizing(&self, _: &Env) -> Sizing {
         Sizing::any()
     }
 
-    fn layout(&self, _: &Env, size: Size2i) -> Self::Layout {
-        size
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, _: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        EmptyInst
+    }
+}
+
+/// An instance of an [`Empty`] widget.
+struct EmptyInst;
+
+impl WidgetBase for Empty {}
+
+impl<Env: WidgetEnvironment + ?Sized> WidgetInst<Env> for EmptyInst {
+    fn draw(&self, _: &Env, _: &mut Env::Drawer) {
+        // Do nothing
     }
 
-    fn relayout(&self, layout: &mut Self::Layout, _: &Env, size: Size2i) {
-        *layout = size
+    fn cursor_event(&self, _: &mut Env, _: Vector2i, _: CursorEvent) -> CursorEventResponse<Env> {
+        CursorEventResponse::Bubble
     }
 
-    fn draw(_: WidgetInst<Self>, _: &Env, _: &mut Env::Drawer) {
-        // Nothing to do here
+    fn focus(&self, _: &mut Env, _: bool) -> Option<FocusInteractionRequest<Env>> {
+        None
     }
 }

@@ -1,9 +1,7 @@
-use std::cell::Cell;
-use std::rc::Rc;
-
 use crate::wgpu::*;
 use ::wgpu;
-use uial::widget::{DynWidget, DynWidgetLayout};
+use std::cell::Cell;
+use std::rc::Rc;
 use uial::drawer::*;
 use uial::*;
 
@@ -16,7 +14,7 @@ pub trait Application {
     fn title(&self) -> &str;
 
     /// Gets the content of the application as a [`Widget`].
-    fn body(&self, env: &RunEnv<Self::State>) -> Box<DynWidget<'_, RunEnv<Self::State>>>;
+    fn body(&self, env: &RunEnv<Self::State>) -> impl Widget<RunEnv<Self::State>> + '_;
 
     /// Updates the state of the application in response to the passage of time.
     fn update(&self, env: &mut RunEnv<Self::State>, delta_time: Duration) {
@@ -65,8 +63,6 @@ struct RawRunEnv<'state, S: HasReact + Track + 'static> {
     image_atlas: &'static WgpuImageAtlas<'static>,
     drawer_context: &'static WgpuDrawerContext<'static>,
     state: &'state mut S,
-    cursor: &'static ReactCell<S::React, Option<Rc<RunCursor<S>>>>,
-    root: Option<&'static RunWidgetRoot<S>>,
 }
 
 impl<S: HasReact + Track> HasWgpuContext<'static> for RunEnv<S> {
@@ -120,169 +116,115 @@ impl<S: HasReact + Track> Track for RunEnv<S> {
 
 impl<S: HasReact + Track> WidgetEnvironment for RunEnv<S> {
     type Drawer = WgpuErasedDrawer;
+}
 
-    fn interactions(&self, mut f: impl FnMut(&dyn Interaction)) {
-        if let Some(cursor) = self.raw.cursor.get(self) {
-            cursor.handler.get(self).interactions(self, &mut f);
+struct RunWidgetSlot<S: HasReact + Track + 'static> {
+    size: &'static ReactCell<S::React, Size2i>,
+}
+
+impl<S: HasReact + Track + 'static> Clone for RunWidgetSlot<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S: HasReact + Track + 'static> Copy for RunWidgetSlot<S> {}
+
+/// The type of [`WidgetSlot`] provided to the top-level [`WidgetInst`].
+impl<S: HasReact + Track + 'static> WidgetSlot<RunEnv<S>> for RunWidgetSlot<S> {
+    fn is_visible(&self, env: &RunEnv<S>) -> bool {
+        // TODO: Should be false while the window is minimized
+        true
+    }
+
+    fn size(&self, env: &RunEnv<S>) -> Size2i {
+        self.size.get(env)
+    }
+
+    fn min(&self, _: &RunEnv<S>) -> Point2i {
+        vec2i(0, 0)
+    }
+
+    fn bubble_general_event(&self, _: &mut RunEnv<S>, _: GeneralEvent) {
+        // Nothing to do here
+    }
+}
+
+/// A set of interaction handlers with disjoint [`FocusScope`].
+struct InteractionHandlerSet<'ui, Env: WidgetEnvironment + ?Sized> {
+    cursor: Option<CursorInteractionRequest<'ui, Env>>,
+    focus: Vec<FocusInteractionRequest<'ui, Env>>,
+}
+
+impl<'ui, Env: WidgetEnvironment + ?Sized> InteractionHandlerSet<'ui, Env> {
+    /// Constructs a new [`InteractionHandlerSet`].
+    pub fn new() -> Self {
+        Self {
+            cursor: None,
+            focus: Vec::new(),
         }
     }
 
-    fn with_locate<'a, W: Widget<Self>, R>(
-        &self,
-        widget: &'a W,
-        f: impl FnOnce(WidgetInst<'a, '_, W>) -> R,
-    ) -> Option<R> {
-        let mut outline = WidgetOutline::new();
-        let inst = self.raw.root?.inst(self);
-        inst.inner().outline(&mut outline);
-        outline.locate(widget).map(f)
+    /// Installs a cursor interaction handler, evicting any existing handler with overlapping
+    /// scope.
+    pub fn install_cursor(&mut self, req: CursorInteractionRequest<'ui, Env>) {
+        self.remove(req.scope);
+        self.cursor = Some(req);
     }
-}
 
-/// Encapsulates the information needed to obtain a [`WidgetInst`] for the root widget.
-struct RunWidgetRoot<S: HasReact + Track + 'static> {
-    widget: Box<DynWidget<'static, RunEnv<S>>>,
-    size: ReactCell<S::React, Size2i>,
-    layout_cache: Cache<RunEnv<S>, Rc<Box<DynWidgetLayout<'static, RunEnv<S>>>>>,
-}
+    /// Installs a focus interaction handler, evicting any existing handler with overlapping scope.
+    pub fn install_focus(&mut self, req: FocusInteractionRequest<'ui, Env>) {
+        self.remove(req.scope);
+        self.focus.push(req);
+    }
 
-impl<S: HasReact + Track + 'static> RunWidgetRoot<S> {
-    /// Gets the current layout of the widget.
-    pub fn layout(&self, env: &RunEnv<S>) -> Rc<Box<DynWidgetLayout<'static, RunEnv<S>>>> {
-        self.layout_cache.get(env, |env, layout| {
-            let size = self.size.get(env);
-            if let Some(layout) = layout {
-                if let Ok(mut layout) = Rc::try_unwrap(layout) {
-                    self.widget.relayout(&mut layout, env, size);
-                    Rc::new(layout)
-                } else {
-                    Rc::new(self.widget.layout(env, size))
-                }
-            } else {
-                Rc::new(self.widget.layout(env, size))
+    /// Gets the cursor interaction handler, if one is installed.
+    pub fn cursor(&self) -> Option<Rc<dyn CursorInteractionHandler<'ui, Env> + 'ui>> {
+        self.cursor.as_ref().map(|req| req.handler.clone())
+    }
+
+    /// Gets the interaction handler, if any, that overlaps the given [`FocusScope`].
+    pub fn get(&self, aspect: FocusScope) -> Option<DynInteractionHandler<'ui, Env>> {
+        if let Some(cursor) = &self.cursor {
+            if cursor.scope.overlaps(aspect) {
+                return Some(DynInteractionHandler::Cursor(cursor.handler.clone()));
             }
-        })
-    }
-
-    /// Gets the current [`RunWidgetRootInst`] for this widget.
-    pub fn inst(&self, env: &RunEnv<S>) -> RunWidgetRootInst<S> {
-        RunWidgetRootInst {
-            widget: &self.widget,
-            layout: self.layout(env),
         }
-    }
-}
-
-/// A wrapper over a [`WidgetInst`] for a [`RunWidgetRoot`].
-struct RunWidgetRootInst<'a, S: HasReact + Track + 'static> {
-    widget: &'a DynWidget<'static, RunEnv<S>>,
-    layout: Rc<Box<DynWidgetLayout<'static, RunEnv<S>>>>,
-}
-
-impl<'a, S: HasReact + Track> RunWidgetRootInst<'a, S> {
-    /// Gets the [`WidgetInst`] for this [`RunWidgetRootInst`].
-    pub fn inner(&self) -> WidgetInst<'a, '_, DynWidget<'static, RunEnv<S>>> {
-        WidgetInst {
-            widget: self.widget,
-            min: vec2i(0, 0),
-            layout: &self.layout,
+        for focus in &self.focus {
+            if focus.scope.overlaps(aspect) {
+                return Some(DynInteractionHandler::Focus(focus.handler.clone()));
+            }
         }
-    }
-}
-
-/// A cursor for a [`RunEnv`].
-pub struct RunCursor<S: HasReact + Track + 'static> {
-    pos: ReactCell<S::React, Point2i>,
-    handler: ReactCell<S::React, Rc<DynCursorHandler<'static, RunEnv<S>>>>,
-    keyboard: &'static RunKeyboard<S>,
-}
-
-impl<S: HasReact + Track> Cursor<'static, RunEnv<S>> for RunCursor<S> {
-    fn pos(&self, env: &RunEnv<S>) -> Point2i {
-        self.pos.get(env)
+        None
     }
 
-    type Keyboard = &'static RunKeyboard<S>;
-    fn keyboard(&self, _: &RunEnv<S>) -> Option<Self::Keyboard> {
-        Some(self.keyboard)
+    /// Removes the cursor interaction handler, if one is installed.
+    pub fn remove_cursor(&mut self) {
+        self.cursor = None;
     }
 
-    fn set_handler(&self, env: &mut RunEnv<S>, handler: impl CursorHandler<RunEnv<S>> + 'static) {
-        self.handler
-            .set(env, DynCursorHandler::from_rc(Rc::new(handler)))
-    }
-
-    fn clear_handler(&self, env: &mut RunEnv<S>) {
-        // SAFETY: `cursor` doesn't actually live for `'static`, but since this reference can't
-        // escape outside the cursor itself, it won't be dereferenced after the cursor is dropped.
-        let cursor: &'static Self = unsafe { std::mem::transmute(self) };
-        self.handler.set(
-            env,
-            DynCursorHandler::from_rc(Rc::new(DefaultHandler(cursor))),
-        );
-    }
-
-    fn default_interactions(
-        &self,
-        env: &RunEnv<S>,
-        mut f: impl FnMut(&dyn Interaction),
-    ) -> EventStatus {
-        // SAFETY: `cursor` doesn't actually live for `'static`, but since this reference can't
-        // escape outside the cursor itself, it won't be dereferenced after the cursor is dropped.
-        let cursor: &'static Self = unsafe { std::mem::transmute(self) };
-        if let Some(root) = env.raw.root {
-            root.inst(env)
-                .inner()
-                .hover_interactions(env, cursor, &mut f)
-        } else {
-            EventStatus::Bubble
+    /// Removes all interaction handlers whose [`FocusScope`] overlaps the given [`FocusScope`]
+    /// from this set.
+    pub fn remove(&mut self, aspect: FocusScope) {
+        if let Some(cursor) = &self.cursor {
+            if cursor.scope.overlaps(aspect) {
+                self.cursor = None;
+            }
         }
+        self.focus.retain(|f| !f.scope.overlaps(aspect));
     }
 
-    fn default_mouse_scroll(&self, env: &mut RunEnv<S>, amount: ScrollAmount) -> EventStatus {
-        // SAFETY: `cursor` doesn't actually live for `'static`, but since this reference can't
-        // escape outside the cursor itself, it won't be dereferenced after the cursor is dropped.
-        let cursor: &'static Self = unsafe { std::mem::transmute(self) };
-        if let Some(root) = env.raw.root {
-            root.inst(env).inner().mouse_scroll(env, cursor, amount)
-        } else {
-            EventStatus::Bubble
-        }
-    }
-
-    fn default_mouse_down(&self, env: &mut RunEnv<S>, button: MouseButton) -> EventStatus {
-        // SAFETY: `cursor` doesn't actually live for `'static`, but since this reference can't
-        // escape outside the cursor itself, it won't be dereferenced after the cursor is dropped.
-        let cursor: &'static Self = unsafe { std::mem::transmute(self) };
-        if let Some(root) = env.raw.root {
-            root.inst(env).inner().mouse_down(env, cursor, button)
-        } else {
-            EventStatus::Bubble
-        }
+    /// Removes all interaction handlers from this set.
+    pub fn clear(&mut self) {
+        self.cursor = None;
+        self.focus.clear();
     }
 }
 
-/// Represents the keyboard in a [`RunEnv`].
-pub struct RunKeyboard<S: HasReact + Track + 'static> {
-    keys_held: ReactCell<S::React, Vec<Key>>,
-    handler: ReactCell<S::React, Rc<DynKeyboardHandler<'static, RunEnv<S>>>>,
-}
-
-impl<S: HasReact + Track> Keyboard<'static, RunEnv<S>> for RunKeyboard<S> {
-    fn keys_held(&self, env: &RunEnv<S>, held: impl FnMut(Key)) {
-        self.keys_held
-            .with_ref(env, |keys_held| keys_held.iter().copied().for_each(held))
-    }
-
-    fn set_handler(&self, env: &mut RunEnv<S>, handler: impl KeyboardHandler<RunEnv<S>> + 'static) {
-        // TODO: Avoid double-wrapping
-        self.handler.set(env, Rc::new(handler))
-    }
-
-    fn default_key_down(&self, _: &mut RunEnv<S>, _: Key) -> EventStatus {
-        // Nothing done for default handler
-        EventStatus::Bubble
-    }
+/// Identifies some kind of interaction handler.
+enum DynInteractionHandler<'ui, Env: WidgetEnvironment + ?Sized> {
+    Cursor(Rc<dyn CursorInteractionHandler<'ui, Env> + 'ui>),
+    Focus(Rc<dyn FocusInteractionHandler<'ui, Env> + 'ui>),
 }
 
 /// Initializes and runs an [`Application`].
@@ -320,16 +262,6 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             .expect("Failed to create device");
         let surface_capabilities = surface.get_capabilities(&adapter);
         let draw_format = surface_capabilities.formats[0];
-        let mut config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: draw_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-            alpha_mode: surface_capabilities.alpha_modes[0],
-            view_formats: vec![],
-        };
-        surface.configure(&device, &config);
         let drawer_resources = Cell::<Option<WgpuDrawerResources>>::new(None);
         let mut context = Extender::new(WgpuContext { device, queue });
         let mut image_atlas = Extender::new(WgpuImageAtlas::new(Extender::as_ref(&context)));
@@ -338,40 +270,27 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             Extender::as_ref(&image_atlas),
             draw_format,
         ));
-        let mut cursor = Extender::new(
-            state
-                .react()
-                .new_cell::<Option<Rc<RunCursor<App::State>>>>(None),
-        );
-        let mut keyboard = Extender::new(RunKeyboard {
-            keys_held: state.react().new_cell(Vec::new()),
-            handler: state.react().new_cell(Rc::new(())),
-        });
 
         // Initialize application
         let mut app = Extender::new(app);
-        let mut root = Extender::new(RunWidgetRoot {
-            widget: Extender::as_ref(&app).body(RunEnv::from_raw(&RawRunEnv {
-                image_atlas: Extender::as_ref(&image_atlas),
-                drawer_context: Extender::as_ref(&drawer_context),
-                state: &mut state,
-                cursor: Extender::as_ref(&cursor),
-                root: None,
-            })),
-            size: state.react().new_cell(size2i(size.width, size.height)),
-            layout_cache: Cache::new(),
-        });
-
-        // Apply min/max window size
-        // TODO: Update when changed
-        let sizing = root.widget.sizing(RunEnv::from_raw(&RawRunEnv {
+        let widget = Extender::new(Extender::as_ref(&app).body(RunEnv::from_raw(&RawRunEnv {
             image_atlas: Extender::as_ref(&image_atlas),
             drawer_context: Extender::as_ref(&drawer_context),
             state: &mut state,
-            cursor: Extender::as_ref(&cursor),
-            root: None,
+        })));
+        let sizing = widget.sizing(RunEnv::from_raw(&RawRunEnv {
+            image_atlas: Extender::as_ref(&image_atlas),
+            drawer_context: Extender::as_ref(&drawer_context),
+            state: &mut state,
         }));
+
+        // Apply min/max window size
+        // TODO: Update when changed
+        let mut size = size2i(size.width, size.height);
         if let Some((min, max)) = sizing.as_range() {
+            size.x = u32::clamp(size.x, min.x, max.x);
+            size.y = u32::clamp(size.y, min.y, max.y);
+            window.set_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
             window.set_min_inner_size(Some(winit::dpi::PhysicalSize::new(min.x, min.y)));
             window.set_max_inner_size(if max.x < u32::MAX && max.y < u32::MAX {
                 Some(winit::dpi::PhysicalSize::new(max.x, max.y))
@@ -380,7 +299,36 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             });
         }
 
+        // Configure surface
+        let mut config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: draw_format,
+            width: size.x,
+            height: size.y,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: surface_capabilities.alpha_modes[0],
+            view_formats: vec![],
+        };
+        surface.configure(&context.device, &config);
+
+        // Initialize widget
+        let mut size = Extender::new(state.react().new_cell(size));
+        let mut inst = Extender::new(Extender::as_ref(&widget).inst(
+            RunEnv::from_raw(&RawRunEnv {
+                image_atlas: Extender::as_ref(&image_atlas),
+                drawer_context: Extender::as_ref(&drawer_context),
+                state: &mut state,
+            }),
+            RunWidgetSlot {
+                size: Extender::as_ref(&size),
+            },
+        ));
+
+        // Initialize interaction handlers
+        let mut handlers = Extender::new(state.react().new_cell(InteractionHandlerSet::new()));
+
         // Begin main loop
+        let mut cursor_pos = None;
         let mut prev_time = std::time::Instant::now();
         event_loop.run(move |event, _, control_flow| {
             use winit::event::*;
@@ -390,8 +338,6 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 image_atlas: Extender::as_ref(&image_atlas),
                 drawer_context: Extender::as_ref(&drawer_context),
                 state: &mut state,
-                cursor: Extender::as_ref(&cursor),
-                root: Some(Extender::as_ref(&root)),
             };
             let env = RunEnv::from_raw_mut(&mut raw_env);
             let cur_time = std::time::Instant::now();
@@ -401,84 +347,70 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::Resized(n_size) => {
-                        config.width = n_size.width;
-                        config.height = n_size.height;
-                        root.size.set(env, size2i(n_size.width, n_size.height));
-                        surface.configure(&context.device, &config);
-                        window.request_redraw();
+                        if n_size.width > 0 && n_size.height > 0 {
+                            config.width = n_size.width;
+                            config.height = n_size.height;
+                            size.set(env, size2i(n_size.width, n_size.height));
+                            surface.configure(&context.device, &config);
+                            window.request_redraw();
+                        }
                     }
                     WindowEvent::Focused(focused) => {
                         if focused {
-                            Extender::as_ref(&root).inst(env).inner().focus(
-                                env,
-                                Extender::as_ref(&keyboard),
-                                false,
-                            );
+                            if let Some(req) = Extender::as_ref(&inst).focus(env, false) {
+                                handlers.with_mut(env, |handlers| {
+                                    handlers.install_focus(req);
+                                });
+                            }
                         } else {
-                            keyboard.handler.set(env, Rc::new(()));
+                            handlers.with_mut(env, |handlers| {
+                                handlers.clear();
+                            });
                         }
                     }
                     WindowEvent::KeyboardInput { input, .. } => {
-                        let key = Key {
-                            scan_code: input.scancode,
-                            virtual_key_code: input.virtual_keycode,
-                        };
-                        let handler = keyboard.handler.get(env);
-                        match input.state {
-                            ElementState::Pressed => {
-                                keyboard.keys_held.with_mut(env, |keys_held| {
-                                    keys_held.retain(|k| *k != key);
-                                    keys_held.push(key);
-                                });
-                                handler.key_down(env, key)
-                            }
-                            ElementState::Released => {
-                                keyboard.keys_held.with_mut(env, |keys_held| {
-                                    keys_held.retain(|k| *k != key);
-                                });
-                                handler.key_up(env, key)
-                            }
-                        }
+                        process_general_event(
+                            env,
+                            &handlers,
+                            cursor_pos,
+                            GeneralEvent::Key {
+                                key: Key {
+                                    scan_code: input.scancode,
+                                    virtual_key_code: input.virtual_keycode,
+                                },
+                                is_down: input.state == ElementState::Pressed,
+                            },
+                        );
                     }
                     WindowEvent::CursorMoved { position, .. } => {
-                        let pos =
-                            vec2i(position.x as i32, config.height as i32 - position.y as i32);
-                        if let Some(cursor) = cursor.get(env) {
-                            cursor.pos.set(env, pos);
-                        } else {
-                            let n_cursor = Rc::new(RunCursor {
-                                pos: env.react().new_cell(pos),
-                                handler: env
-                                    .react()
-                                    .new_cell(DynCursorHandler::from_rc(Rc::new(()))),
-                                keyboard: Extender::as_ref(&keyboard),
-                            });
-                            n_cursor.clear_handler(env);
-                            cursor.set(env, Some(n_cursor));
-                        }
+                        cursor_pos = Some(vec2i(
+                            position.x as i32,
+                            config.height as i32 - position.y as i32,
+                        ));
                     }
                     WindowEvent::CursorLeft { .. } => {
-                        cursor.set(env, None);
+                        cursor_pos = None;
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
-                        let amount = match delta {
-                            MouseScrollDelta::LineDelta(x, y) => ScrollAmount::Ticks([x, y]),
-                            MouseScrollDelta::PixelDelta(delta) => {
-                                ScrollAmount::Pixels([delta.x as f32, delta.y as f32])
-                            }
-                        };
-                        if let Some(cursor) = cursor.get(env) {
-                            cursor.handler.get(env).mouse_scroll(env, amount);
-                        }
+                        process_cursor_event(
+                            env,
+                            Extender::as_ref(&inst),
+                            &handlers,
+                            cursor_pos,
+                            CursorEvent::MouseScroll(delta),
+                        );
                     }
                     WindowEvent::MouseInput { state, button, .. } => {
-                        if let Some(cursor) = cursor.get(env) {
-                            let handler = cursor.handler.get(env);
-                            match state {
-                                ElementState::Pressed => handler.mouse_down(env, button),
-                                ElementState::Released => handler.mouse_up(env, button),
-                            }
-                        }
+                        process_cursor_event(
+                            env,
+                            Extender::as_ref(&inst),
+                            &handlers,
+                            cursor_pos,
+                            CursorEvent::MouseButton {
+                                button,
+                                is_down: state == ElementState::Pressed,
+                            },
+                        );
                     }
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => {}
@@ -487,9 +419,18 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    let frame = surface
-                        .get_current_texture()
-                        .expect("Failed to acquire next swap chain texture");
+                    let frame = match surface.get_current_texture() {
+                        Ok(frame) => frame,
+                        Err(wgpu::SurfaceError::Timeout) => surface
+                            .get_current_texture()
+                            .expect("Failed to acquire next swap chain texture"),
+                        Err(_) => {
+                            surface.configure(&context.device, &config);
+                            surface
+                                .get_current_texture()
+                                .expect("Failed to acquire next swap chain texture")
+                        }
+                    };
                     let view = frame
                         .texture
                         .create_view(&wgpu::TextureViewDescriptor::default());
@@ -499,9 +440,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                         _ => WgpuDrawerResources::new(Extender::as_ref(&drawer_context), size),
                     };
                     drawer_context.draw_to(&mut resources, &view, |drawer| {
-                        root.inst(env)
-                            .inner()
-                            .draw(env, WgpuErasedDrawer::from_mut(drawer))
+                        inst.draw(env, WgpuErasedDrawer::from_mut(drawer))
                     });
                     drawer_resources.set(Some(resources));
                     frame.present();
@@ -509,9 +448,9 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 Event::LoopDestroyed => {
                     drop(drawer_resources.take());
                     unsafe {
-                        Extender::drop(&mut keyboard);
-                        Extender::drop(&mut cursor);
-                        Extender::drop(&mut root);
+                        Extender::drop(&mut handlers);
+                        Extender::drop(&mut inst);
+                        Extender::drop(&mut size);
                         Extender::drop(&mut app);
                         Extender::drop(&mut drawer_context);
                         Extender::drop(&mut image_atlas);
@@ -545,6 +484,93 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
     }
 }
 
+/// Processes a cursor event
+fn process_cursor_event<'ui, S: HasReact + Track>(
+    env: &mut RunEnv<S>,
+    inst: &'ui impl WidgetInst<RunEnv<S>>,
+    handlers: &ReactCell<S::React, InteractionHandlerSet<'ui, RunEnv<S>>>,
+    pos: Option<Point2i>,
+    event: CursorEvent,
+) {
+    let handler = handlers.with_ref(env, |handlers| handlers.cursor());
+    match handler {
+        Some(handler) => match handler.cursor_event(env, pos.unwrap(), event) {
+            CursorInteractionEventResponse::Keep => {}
+            CursorInteractionEventResponse::Replace(req) => {
+                handlers.with_mut(env, |handlers| {
+                    handlers.install_cursor(req);
+                });
+            }
+            CursorInteractionEventResponse::Downgrade(req) => {
+                handlers.with_mut(env, |handlers| {
+                    handlers.install_focus(req);
+                });
+            }
+            CursorInteractionEventResponse::End => {
+                handlers.with_mut(env, |handlers| {
+                    handlers.remove_cursor();
+                });
+            }
+        },
+        None => {
+            if let Some(pos) = pos {
+                let res = inst.cursor_event(env, pos, event);
+                if let widget::CursorEventResponse::Start(req) = res {
+                    handlers.with_mut(env, |handlers| {
+                        handlers.install_cursor(req);
+                    });
+                }
+            }
+        }
+    }
+}
+
+/// Processes a general event
+fn process_general_event<S: HasReact + Track>(
+    env: &mut RunEnv<S>,
+    handlers: &ReactCell<S::React, InteractionHandlerSet<RunEnv<S>>>,
+    cursor_pos: Option<Point2i>,
+    event: GeneralEvent,
+) {
+    let handler = handlers.with_ref(env, |handlers| handlers.get(FocusScope::KEYBOARD));
+    match handler {
+        Some(DynInteractionHandler::Cursor(handler)) => {
+            match handler.general_event(env, cursor_pos.unwrap(), event) {
+                CursorInteractionEventResponse::Keep => {}
+                CursorInteractionEventResponse::Replace(req) => {
+                    handlers.with_mut(env, |handlers| {
+                        handlers.install_cursor(req);
+                    });
+                }
+                CursorInteractionEventResponse::Downgrade(req) => {
+                    handlers.with_mut(env, |handlers| {
+                        handlers.install_focus(req);
+                    });
+                }
+                CursorInteractionEventResponse::End => {
+                    handlers.with_mut(env, |handlers| {
+                        handlers.remove_cursor();
+                    });
+                }
+            }
+        }
+        Some(DynInteractionHandler::Focus(handler)) => match handler.general_event(env, event) {
+            FocusInteractionEventResponse::Keep => {}
+            FocusInteractionEventResponse::Replace(req) => {
+                handlers.with_mut(env, |handlers| {
+                    handlers.install_focus(req);
+                });
+            }
+            FocusInteractionEventResponse::End => {
+                handlers.with_mut(env, |handlers| {
+                    handlers.remove(FocusScope::KEYBOARD);
+                });
+            }
+        },
+        None => {}
+    }
+}
+
 /// Wraps an enclosed value of type `T` and provides a `'static` reference to it.
 ///
 /// The enclosed value may be explicitly dropped by calling [`Extender::drop`], but it is up
@@ -563,7 +589,7 @@ impl<T> Extender<T> {
     }
 
     /// Drops the enclosed value of an [`Extender`].
-    /// 
+    ///
     /// ## Safety
     /// The caller must ensure that the enclosed value is not accessed after this call, and that
     /// this is called at most once.

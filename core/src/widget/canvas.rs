@@ -24,14 +24,7 @@ pub fn canvas<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Dra
     Canvas::new(draw)
 }
 
-impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer)> WidgetBase
-    for Canvas<Env, F>
-{
-    type Layout = Size2i;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        *layout
-    }
-}
+impl<Env: ?Sized, F> WidgetBase for Canvas<Env, F> {}
 
 impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer)> Widget<Env>
     for Canvas<Env, F>
@@ -40,15 +33,37 @@ impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer)> Wid
         Sizing::any()
     }
 
-    fn layout(&self, _: &Env, size: Size2i) -> Self::Layout {
-        size
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        CanvasInst { widget: self, slot }
+    }
+}
+
+/// An instance of a [`Canvas`] widget.
+struct CanvasInst<'a, Env: WidgetEnvironment + ?Sized, F, Slot> {
+    widget: &'a Canvas<Env, F>,
+    slot: Slot,
+}
+
+impl<
+        'a,
+        Env: WidgetEnvironment + ?Sized,
+        F: Fn(&Env, Size2i, &mut Env::Drawer),
+        Slot: WidgetSlot<Env>,
+    > WidgetInst<Env> for CanvasInst<'a, Env, F, Slot>
+{
+    fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
+        // TODO: Translate the drawer to the slot's minimum corner
+        (self.widget.draw)(env, self.slot.size(env), drawer)
     }
 
-    fn relayout(&self, layout: &mut Self::Layout, _: &Env, size: Size2i) {
-        *layout = size
+    fn cursor_event(&self, _: &mut Env, _: Vector2i, _: CursorEvent) -> CursorEventResponse<Env> {
+        CursorEventResponse::Bubble
     }
 
-    fn draw(inst: WidgetInst<Self>, env: &Env, drawer: &mut Env::Drawer) {
-        (inst.widget.draw)(env, *inst.layout, drawer)
+    fn focus(&self, _: &mut Env, _: bool) -> Option<FocusInteractionRequest<Env>> {
+        None
     }
 }

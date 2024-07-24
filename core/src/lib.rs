@@ -1,6 +1,5 @@
 #![allow(clippy::bool_assert_comparison)]
 mod cache;
-mod downcast;
 pub mod drawer;
 mod input;
 mod prop;
@@ -19,11 +18,11 @@ pub use time::*;
 pub use uial_geometry::{size2i, vec2i, Box2i, Padding2i, Point2i, Similarity2i, Size2i, Vector2i};
 pub use uial_geometry::{vec2, Box2, Scalar, Vector2, PI};
 pub use uial_geometry::{Duration, Instant};
+
 pub use widget::DynWidget;
+pub use widget::{OnClickWidgetExt, OnKeyWidgetExt};
 pub use widget::{ExtendWidgetExt, PadWidgetExt, RestrictWidgetExt, SwitchWidgetExt};
-pub use widget::{OnKeyWidgetExt, OverlayInstExt};
-pub use widget::{Widget, WidgetBase, WidgetEnvironment, WidgetInner, WidgetLayout};
-pub use widget::{WidgetInst, WidgetOutline, WidgetOutliner, WidgetOutlinerExt};
+pub use widget::{Widget, WidgetBase, WidgetEnvironment, WidgetInst, WidgetSlot};
 
 /// Re-exports of the [`uial_geometry`] crate.
 pub mod geometry {

@@ -2,6 +2,7 @@ use super::*;
 use crate::drawer::Transform;
 use std::marker::PhantomData;
 use uial_geometry::Similarity2;
+use winit::event::MouseScrollDelta;
 
 /// Encapsulates the state information for the "camera" of a [`ZoomCanvas`] which determines the
 /// projection used to draw the canvas contents.
@@ -157,10 +158,6 @@ impl<
         F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
     > WidgetBase for ZoomCanvas<Env, C, F>
 {
-    type Layout = Size2i;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        *layout
-    }
 }
 
 impl<
@@ -173,38 +170,70 @@ impl<
         Sizing::any()
     }
 
-    fn layout(&self, _: &Env, size: Size2i) -> Self::Layout {
-        size
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        ZoomCanvasInst { widget: self, slot }
     }
+}
 
-    fn relayout(&self, layout: &mut Self::Layout, _: &Env, size: Size2i) {
-        *layout = size
-    }
+/// An instance of a [`ZoomCanvas`] widget.
+pub struct ZoomCanvasInst<
+    'a,
+    Env: WidgetEnvironment + ?Sized,
+    C: PropertyBase<Value = Camera>,
+    F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+    Slot,
+> {
+    widget: &'a ZoomCanvas<Env, C, F>,
+    slot: Slot,
+}
 
-    fn draw(inst: WidgetInst<Self>, env: &Env, drawer: &mut Env::Drawer) {
-        let mut proj = inst.widget.camera.get(env).projection();
+impl<
+        'a,
+        Env: WidgetEnvironment + ?Sized,
+        C: Field<Env, Value = Camera>,
+        F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+        Slot: WidgetSlot<Env>,
+    > WidgetInst<Env> for ZoomCanvasInst<'a, Env, C, F, Slot>
+{
+    fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
+        let mut proj = self.widget.camera.get(env).projection();
+        let bounds = self.slot.bounds(env);
         proj = Similarity2::translate(
-            inst.min.into_float() + inst.layout.into_vec().into_float() / 2.0,
+            bounds.min.into_float() + bounds.size().into_vec().into_float() / 2.0,
         ) * proj;
-        (inst.widget.draw)(env, &mut Transform::new(drawer, proj))
+        (self.widget.draw)(env, &mut Transform::new(drawer, proj))
     }
 
-    fn mouse_scroll<'a>(
-        inst: WidgetInst<'a, '_, Self>,
+    fn cursor_event(
+        &self,
         env: &mut Env,
-        cursor: impl Cursor<'a, Env>,
-        amount: ScrollAmount,
-    ) -> EventStatus {
-        let ln_scale = match amount {
-            ScrollAmount::Ticks([_, y]) => y * 0.3,
-            ScrollAmount::Pixels([_, y]) => y * 0.01,
-        };
-        let pos = cursor.pos(env);
-        inst.widget.camera.with_mut(env, |camera| {
-            let point = camera
-                .unproj((pos - inst.min).into_float() - inst.layout.into_vec().into_float() / 2.0);
-            camera.zoom(point, ln_scale);
-        });
-        EventStatus::Handled
+        pos: Vector2i,
+        event: CursorEvent,
+    ) -> CursorEventResponse<Env> {
+        match event {
+            CursorEvent::MouseScroll(amount) => {
+                let ln_scale = match amount {
+                    MouseScrollDelta::LineDelta(_, y) => y * 0.3,
+                    MouseScrollDelta::PixelDelta(delta) => (delta.y as f32) * 0.01,
+                };
+                let bounds = self.slot.bounds(env);
+                self.widget.camera.with_mut(env, |camera| {
+                    let point = camera.unproj(
+                        (pos - bounds.min).into_float()
+                            - bounds.size().into_vec().into_float() / 2.0,
+                    );
+                    camera.zoom(point, ln_scale);
+                });
+                CursorEventResponse::Handled
+            }
+            _ => CursorEventResponse::Bubble,
+        }
+    }
+
+    fn focus(&self, _: &mut Env, _: bool) -> Option<FocusInteractionRequest<Env>> {
+        None
     }
 }

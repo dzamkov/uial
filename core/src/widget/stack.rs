@@ -86,29 +86,14 @@ impl<A, B, const VERTICAL: bool> Stack<A, B, VERTICAL> {
     }
 }
 
-/// The layout for an [`Stack`] widget.
-pub struct StackLayout<A: WidgetLayout + ?Sized, B: WidgetLayout + ?Sized> {
-    a: A::Owned,
-    b: B::Owned,
-}
+impl<A: WidgetBase, B: WidgetBase, const VERTICAL: bool> WidgetBase for Stack<A, B, VERTICAL> {}
 
-impl<A: WidgetBase, B: WidgetBase, const VERTICAL: bool> WidgetBase for Stack<A, B, VERTICAL> {
-    type Layout = StackLayout<A::Layout, B::Layout>;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        let size_a = self.a.size(layout.a.borrow());
-        let size_b = self.b.size(layout.b.borrow());
-        if VERTICAL {
-            debug_assert_eq!(size_a.x, size_b.x);
-            size2i(size_a.x, size_a.y + size_b.y)
-        } else {
-            debug_assert_eq!(size_a.y, size_b.y);
-            size2i(size_a.x + size_b.x, size_a.y)
-        }
-    }
-}
-
-impl<Env: WidgetEnvironment + ?Sized, A: Widget<Env>, B: Widget<Env>, const VERTICAL: bool>
-    Widget<Env> for Stack<A, B, VERTICAL>
+impl<
+        Env: WidgetEnvironment + Track + ?Sized,
+        A: Widget<Env>,
+        B: Widget<Env>,
+        const VERTICAL: bool,
+    > Widget<Env> for Stack<A, B, VERTICAL>
 {
     fn sizing(&self, env: &Env) -> Sizing {
         let sizing_a = self.a.sizing(env);
@@ -120,149 +105,180 @@ impl<Env: WidgetEnvironment + ?Sized, A: Widget<Env>, B: Widget<Env>, const VERT
         }
     }
 
-    fn layout(&self, env: &Env, size: Size2i) -> Self::Layout {
-        let sizing_a = self.a.sizing(env);
-        let sizing_b = self.b.sizing(env);
-        if VERTICAL {
-            let size_y_a = split_size_y(&sizing_a, &sizing_b, self.split, size);
-            StackLayout {
-                a: self.a.layout(env, size2i(size.x, size_y_a)),
-                b: self.b.layout(env, size2i(size.x, size.y - size_y_a)),
-            }
-        } else {
-            let size_x_a = split_size_x(&sizing_a, &sizing_b, self.split, size);
-            StackLayout {
-                a: self.a.layout(env, size2i(size_x_a, size.y)),
-                b: self.b.layout(env, size2i(size.x - size_x_a, size.y)),
-            }
-        }
-    }
-
-    #[rustfmt::skip]
-    fn relayout(&self, layout: &mut Self::Layout, env: &Env, size: Size2i) {
-        let sizing_a = self.a.sizing(env);
-        let sizing_b = self.b.sizing(env);
-        if VERTICAL {
-            let size_y_a = split_size_y(&sizing_a, &sizing_b, self.split, size);
-            self.a.relayout(layout.a.borrow_mut(), env, size2i(size.x, size_y_a));
-            self.b.relayout(layout.b.borrow_mut(), env, size2i(size.x, size.y - size_y_a));
-        } else {
-            let size_x_a = split_size_x(&sizing_a, &sizing_b, self.split, size);
-            self.a.relayout(layout.a.borrow_mut(), env, size2i(size_x_a, size.y));
-            self.b.relayout(layout.b.borrow_mut(), env, size2i(size.x - size_x_a, size.y));
-        }
-    }
-
-    fn outline<'a>(
-        inst: WidgetInst<'a, 'a, Self>,
-        outliner: &mut (impl WidgetOutliner<'a, Env> + ?Sized),
-    ) {
-        inner_a(inst).outline(outliner);
-        inner_b(inst).outline(outliner);
-    }
-
-    fn draw(inst: WidgetInst<Self>, env: &Env, drawer: &mut Env::Drawer) {
-        inner_a(inst).draw(env, drawer);
-        inner_b(inst).draw(env, drawer);
-    }
-
-    fn hover_interactions<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        f: &mut impl FnMut(&dyn Interaction),
-    ) -> EventStatus {
-        if side(inst, cursor.pos(env)) {
-            inner_b(inst).hover_interactions(env, cursor, f)
-        } else {
-            inner_a(inst).hover_interactions(env, cursor, f)
-        }
-    }
-
-    fn mouse_scroll<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        amount: ScrollAmount,
-    ) -> EventStatus {
-        if side(inst, cursor.pos(env)) {
-            inner_b(inst).mouse_scroll(env, cursor, amount)
-        } else {
-            inner_a(inst).mouse_scroll(env, cursor, amount)
-        }
-    }
-
-    fn mouse_down<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        button: MouseButton,
-    ) -> EventStatus {
-        if side(inst, cursor.pos(env)) {
-            inner_b(inst).mouse_down(env, cursor, button)
-        } else {
-            inner_a(inst).mouse_down(env, cursor, button)
-        }
-    }
-
-    fn focus<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        keyboard: impl Keyboard<'a, Env> + Clone,
-        backward: bool,
-    ) -> EventStatus {
-        if backward ^ VERTICAL {
-            if let EventStatus::Handled = inner_b(inst).focus(env, keyboard.clone(), backward) {
-                return EventStatus::Handled;
-            }
-            inner_a(inst).focus(env, keyboard, backward)
-        } else {
-            if let EventStatus::Handled = inner_a(inst).focus(env, keyboard.clone(), backward) {
-                return EventStatus::Handled;
-            }
-            inner_b(inst).focus(env, keyboard, backward)
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        let shared = Rc::new(StackShared::<_, _, VERTICAL> {
+            a: DynWidget::from_ref(&self.a),
+            b: DynWidget::from_ref(&self.b),
+            split: self.split,
+            layout_cache: Cache::new(),
+            slot,
+        });
+        StackInst {
+            a: self
+                .a
+                .inst(env, StackSlot::<_, _, VERTICAL, false>(shared.clone())),
+            b: self
+                .b
+                .inst(env, StackSlot::<_, _, VERTICAL, true>(shared.clone())),
+            shared,
         }
     }
 }
 
-/// Gets the [`WidgetInst`] for the first inner widget of a [`Stack`] widget.
-fn inner_a<'a, 'b, A: WidgetBase, B: WidgetBase, const VERTICAL: bool>(
-    inst: WidgetInst<'a, 'b, Stack<A, B, VERTICAL>>,
-) -> WidgetInst<'a, 'b, A> {
-    WidgetInst {
-        widget: &inst.widget.a,
-        min: inst.min,
-        layout: inst.layout.a.borrow(),
-    }
+/// Contains the information that is shared between the two instances of a [`Stack`] widget.
+struct StackShared<'a, Env: WidgetEnvironment + Track + ?Sized, S, const VERTICAL: bool> {
+    // Use `DynWidget` here to prevent explosion of generic types that would otherwise occur.
+    a: &'a DynWidget<'a, Env>,
+    b: &'a DynWidget<'a, Env>,
+    split: RationalU32,
+    layout_cache: Cache<Env, StackLayout>,
+    slot: S,
 }
 
-/// Gets the [`WidgetInst`] for the second inner widget of a [`Stack`] widget.
-fn inner_b<'a, 'b, A: WidgetBase, B: WidgetBase, const VERTICAL: bool>(
-    inst: WidgetInst<'a, 'b, Stack<A, B, VERTICAL>>,
-) -> WidgetInst<'a, 'b, B> {
-    let size_a = inst.widget.a.size(inst.layout.a.borrow());
-    WidgetInst {
-        widget: &inst.widget.b,
-        min: inst.min
-            + if VERTICAL {
-                vec2i(0, size_a.y as i32)
+/// Describes the layout of a [`Stack`] widget at a given moment.
+#[derive(Clone, Copy)]
+struct StackLayout {
+    size: Size2i,
+    split: u32,
+}
+
+impl<'a, Env: WidgetEnvironment + Track + ?Sized, S: WidgetSlot<Env>, const VERTICAL: bool>
+    StackShared<'a, Env, S, VERTICAL>
+{
+    /// Gets the current layout of the widget.
+    pub fn layout(&self, env: &Env) -> StackLayout {
+        self.layout_cache.get(env, |env, _| {
+            let size = self.slot.size(env);
+            let split = if VERTICAL {
+                split_size_y(&self.a.sizing(env), &self.b.sizing(env), self.split, size)
             } else {
-                vec2i(size_a.x as i32, 0)
-            },
-        layout: inst.layout.b.borrow(),
+                split_size_x(&self.a.sizing(env), &self.b.sizing(env), self.split, size)
+            };
+            StackLayout { size, split }
+        })
+    }
+
+    /// Determines which side of the widget a particular point is on.
+    pub fn side(&self, env: &Env, pos: Vector2i) -> bool {
+        let offset = pos - self.slot.min(env);
+        let layout = self.layout(env);
+        if VERTICAL {
+            offset.y >= layout.split as i32
+        } else {
+            offset.x >= layout.split as i32
+        }
     }
 }
 
-/// Determines which side of a [`Stack`] widget instance a particular point is on.
-fn side<A: WidgetBase, B: WidgetBase, const VERTICAL: bool>(
-    inst: WidgetInst<Stack<A, B, VERTICAL>>,
-    pos: Vector2i
-) -> bool {
-    let size_a = inst.widget.a.size(inst.layout.a.borrow());
-    if VERTICAL {
-        pos.y >= inst.min.y + size_a.y as i32
-    } else {
-        pos.x >= inst.min.x + size_a.x as i32
+/// A slot for a [`Stack`] widget.
+struct StackSlot<
+    'a,
+    Env: WidgetEnvironment + Track + ?Sized,
+    S,
+    const VERTICAL: bool,
+    const SIDE: bool,
+>(Rc<StackShared<'a, Env, S, VERTICAL>>);
+
+impl<
+        'a,
+        Env: WidgetEnvironment + Track + ?Sized,
+        S: WidgetSlot<Env>,
+        const VERTICAL: bool,
+        const SIDE: bool,
+    > Clone for StackSlot<'a, Env, S, VERTICAL, SIDE>
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<
+        'a,
+        Env: WidgetEnvironment + Track + ?Sized,
+        S: WidgetSlot<Env>,
+        const VERTICAL: bool,
+        const SIDE: bool,
+    > WidgetSlot<Env> for StackSlot<'a, Env, S, VERTICAL, SIDE>
+{
+    fn is_visible(&self, env: &Env) -> bool {
+        self.0.slot.is_visible(env)
+    }
+
+    fn size(&self, env: &Env) -> Size2i {
+        let layout = self.0.layout(env);
+        if SIDE {
+            if VERTICAL {
+                size2i(layout.size.x, layout.size.y - layout.split)
+            } else {
+                size2i(layout.size.x - layout.split, layout.size.y)
+            }
+        } else if VERTICAL {
+            size2i(layout.size.x, layout.split)
+        } else {
+            size2i(layout.split, layout.size.y)
+        }
+    }
+
+    fn min(&self, env: &Env) -> Point2i {
+        self.0.slot.min(env)
+            + if SIDE {
+                if VERTICAL {
+                    vec2i(0, self.0.layout(env).split as i32)
+                } else {
+                    vec2i(self.0.layout(env).split as i32, 0)
+                }
+            } else {
+                vec2i(0, 0)
+            }
+    }
+
+    fn bubble_general_event(&self, env: &mut Env, event: GeneralEvent) {
+        self.0.slot.bubble_general_event(env, event)
+    }
+}
+
+/// A [`WidgetInst`] for a [`Stack`] widget.
+struct StackInst<'a, Env: WidgetEnvironment + Track + ?Sized, S, A, B, const VERTICAL: bool> {
+    shared: Rc<StackShared<'a, Env, S, VERTICAL>>,
+    a: A,
+    b: B,
+}
+
+impl<
+        Env: WidgetEnvironment + Track + ?Sized,
+        S: WidgetSlot<Env>,
+        A: WidgetInst<Env>,
+        B: WidgetInst<Env>,
+        const VERTICAL: bool,
+    > WidgetInst<Env> for StackInst<'_, Env, S, A, B, VERTICAL>
+{
+    fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
+        self.a.draw(env, drawer);
+        self.b.draw(env, drawer);
+    }
+
+    fn cursor_event(
+        &self,
+        env: &mut Env,
+        pos: Vector2i,
+        event: CursorEvent,
+    ) -> CursorEventResponse<Env> {
+        if self.shared.side(env, pos) {
+            self.b.cursor_event(env, pos, event)
+        } else {
+            self.a.cursor_event(env, pos, event)
+        }
+    }
+
+    fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>> {
+        if backward {
+            self.b.focus(env, backward).or_else(|| self.a.focus(env, backward))
+        } else {
+            self.a.focus(env, backward).or_else(|| self.b.focus(env, backward))
+        }
     }
 }
 

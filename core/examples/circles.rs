@@ -2,6 +2,7 @@ use uial::*;
 use uial::widget::Camera;
 use uial::drawer::*;
 use uial_backend::*;
+use std::rc::Rc;
 
 fn main() {
     const CIRCLES: &[(Vector2, Scalar)] = &[
@@ -38,16 +39,25 @@ fn main() {
     SimpleApplication {
         title: "Circles",
         body: &|env| {
-            let camera = env.react().new_cell(Trajectory::new(
+            let camera = Rc::new(env.react().new_cell(Trajectory::new(
                 Instant::ZERO,
                 Camera::new(vec2(0.0, 0.0), 5.0, -8.0),
-            ));
-            widget::zoom_canvas(camera.current(), |_, drawer| {
+            )));
+            widget::zoom_canvas(camera.clone().current(), |_, drawer| {
                 for (c, r) in CIRCLES.iter().copied() {
                     drawer.draw_circle(srgb(1.0, 1.0, 0.8).into(), c, r)
                 }
             })
-            .into_boxed_dyn()
+            .on_key(move |env, key| {
+                match key.virtual_key_code {
+                    Some(winit::event::VirtualKeyCode::R) => {
+                        (&camera).current().set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));
+                        true
+                    }
+                    _ => false
+                }
+            })
+            .into_rc_dyn()
         },
     }
     .run();

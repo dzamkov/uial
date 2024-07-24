@@ -1,5 +1,6 @@
-use uial::*;
+use std::rc::Rc;
 use uial::drawer::*;
+use uial::*;
 use uial_backend::*;
 
 fn main() {
@@ -11,6 +12,8 @@ fn main() {
             let font_family = ImageTTFontFamily::new(font_data, image_manager).unwrap();
             let ferris = image_manager
                 .load_image(image::load_from_memory(include_bytes!("ferris.png")).unwrap());
+            let num_clicks = Rc::new(env.react().new_cell(0));
+            let num_clicks_clone = num_clicks.clone();
             widget::canvas(move |env: &RunEnv<_>, size, d| {
                 let center = vec2i(size.x as i32 / 2, size.y as i32 / 2);
                 d.fill_rect(
@@ -52,10 +55,20 @@ fn main() {
                         .with_height(20.0)
                         .with_paint(srgba(1.0, 1.0, 0.0, 1.0)),
                     vec2i(30, 400),
-                    &format!("{:?}", HasClock::clock(env)),
+                    &format!("Clock: {:?}", HasClock::clock(env)),
+                );
+                d.draw_text_immediate_ltr::<ImageTTFont<_, _>>(
+                    &(&font_family)
+                        .with_height(20.0)
+                        .with_paint(srgba(0.0, 1.0, 1.0, 1.0)),
+                    vec2i(30, 420),
+                    &format!("Clicks: {:?}", num_clicks_clone.get(env)),
                 );
             })
-            .into_boxed_dyn()
+            .on_click(move |env| {
+                num_clicks.set(env, num_clicks.get(env) + 1);
+            })
+            .into_rc_dyn()
         },
     }
     .run()

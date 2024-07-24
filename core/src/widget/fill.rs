@@ -18,12 +18,7 @@ pub fn fill(paint: Paint) -> Fill {
     Fill::new(paint)
 }
 
-impl WidgetBase for Fill {
-    type Layout = Size2i;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        *layout
-    }
-}
+impl WidgetBase for Fill {}
 
 impl<Env: WidgetEnvironment + ?Sized> Widget<Env> for Fill
 where
@@ -33,15 +28,36 @@ where
         Sizing::any()
     }
 
-    fn layout(&self, _: &Env, size: Size2i) -> Self::Layout {
-        size
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        FillInst {
+            slot,
+            paint: self.paint,
+        }
+    }
+}
+
+/// An instance of a [`Fill`] widget.
+struct FillInst<Slot> {
+    slot: Slot,
+    paint: Paint,
+}
+
+impl<Env: WidgetEnvironment + ?Sized, Slot: WidgetSlot<Env>> WidgetInst<Env> for FillInst<Slot>
+where
+    Env::Drawer: RasterDrawer,
+{
+    fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
+        drawer.fill_rect(self.paint, self.slot.bounds(env))
     }
 
-    fn relayout(&self, layout: &mut Self::Layout, _: &Env, size: Size2i) {
-        *layout = size
+    fn cursor_event(&self, _: &mut Env, _: Vector2i, _: CursorEvent) -> CursorEventResponse<Env> {
+        CursorEventResponse::Bubble
     }
 
-    fn draw(inst: WidgetInst<Self>, _: &Env, drawer: &mut Env::Drawer) {
-        drawer.fill_rect(inst.widget.paint, inst.bounds())
+    fn focus(&self, _: &mut Env, _: bool) -> Option<FocusInteractionRequest<Env>> {
+        None
     }
 }

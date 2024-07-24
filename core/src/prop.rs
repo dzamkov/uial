@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::rc::Rc;
 use std::sync::Arc;
 
 /// Identifies a value of a certain type which can be obtained from an "environment". See
@@ -66,6 +67,22 @@ impl<Env: ?Sized, T: Property<Env>> Property<Env> for &T {
 }
 
 impl<Env: ?Sized, T: Field<Env>> Field<Env> for &T {
+    fn with_mut<R>(&self, env: &mut Env, inner: impl FnOnce(&mut T::Value) -> R) -> R {
+        (**self).with_mut(env, inner)
+    }
+}
+
+impl<T: PropertyBase> PropertyBase for Rc<T> {
+    type Value = T::Value;
+}
+
+impl<Env: ?Sized, T: Property<Env>> Property<Env> for Rc<T> {
+    fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&T::Value) -> R) -> R {
+        (**self).with_ref(env, inner)
+    }
+}
+
+impl<Env: ?Sized, T: Field<Env>> Field<Env> for Rc<T> {
     fn with_mut<R>(&self, env: &mut Env, inner: impl FnOnce(&mut T::Value) -> R) -> R {
         (**self).with_mut(env, inner)
     }

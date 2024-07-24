@@ -1,5 +1,22 @@
 use super::*;
 
+/// Constructs a [`Widget`] by "overlaying" the given [`Widget`]s in the same layout rectangle.
+#[macro_export]
+macro_rules! overlay {
+    [$head:expr, $($tail:expr),*] => {
+        {
+            let res = $head;
+            $(
+                let res = $crate::widget::overlay(
+                    res,
+                    $tail
+                );
+            )*
+            res
+        }
+    }
+}
+
 /// A [`Widget`] which combines two source [`Widget`]s in the same layout rectangle, overlaying
 /// one on top of the other.
 pub struct Overlay<Below, Above> {
@@ -15,15 +32,7 @@ pub fn overlay<Below: WidgetBase, Above: WidgetBase>(
     Overlay { below, above }
 }
 
-impl<Below: WidgetBase, Above: WidgetBase> WidgetBase for Overlay<Below, Above> {
-    type Layout =
-        Overlay<<Below::Layout as WidgetLayout>::Owned, <Above::Layout as WidgetLayout>::Owned>;
-    fn size(&self, layout: &Self::Layout) -> Size2i {
-        let size = Below::size(&self.below, layout.below.borrow());
-        debug_assert_eq!(size, Above::size(&self.above, layout.above.borrow()));
-        size
-    }
-}
+impl<Below: WidgetBase, Above: WidgetBase> WidgetBase for Overlay<Below, Above> {}
 
 impl<Env: WidgetEnvironment + ?Sized, Below: Widget<Env>, Above: Widget<Env>> Widget<Env>
     for Overlay<Below, Above>
@@ -32,105 +41,50 @@ impl<Env: WidgetEnvironment + ?Sized, Below: Widget<Env>, Above: Widget<Env>> Wi
         &self.below.sizing(env) & &self.above.sizing(env)
     }
 
-    fn layout(&self, env: &Env, size: Size2i) -> Self::Layout {
-        Overlay {
-            below: self.below.layout(env, size),
-            above: self.above.layout(env, size),
+    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    where
+        Env: 'a,
+    {
+        OverlayInst {
+            below: self.below.inst(env, slot.clone()),
+            above: self.above.inst(env, slot),
         }
-    }
-
-    fn relayout(&self, layout: &mut Self::Layout, env: &Env, size: Size2i) {
-        self.below.relayout(layout.below.borrow_mut(), env, size);
-        self.above.relayout(layout.above.borrow_mut(), env, size);
-    }
-
-    fn outline<'a>(
-        inst: WidgetInst<'a, 'a, Self>,
-        outliner: &mut (impl WidgetOutliner<'a, Env> + ?Sized),
-    ) {
-        inst.below().outline(outliner);
-        inst.above().outline(outliner);
-    }
-
-    fn draw(inst: WidgetInst<Self>, env: &Env, drawer: &mut Env::Drawer) {
-        inst.below().draw(env, drawer);
-        inst.above().draw(env, drawer);
-    }
-
-    fn hover_interactions<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        f: &mut impl FnMut(&dyn Interaction),
-    ) -> EventStatus {
-        if let EventStatus::Handled = inst.above().hover_interactions(env, cursor.clone(), f) {
-            return EventStatus::Handled;
-        }
-        inst.below().hover_interactions(env, cursor, f)
-    }
-
-    fn mouse_scroll<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        amount: ScrollAmount,
-    ) -> EventStatus {
-        if let EventStatus::Handled = inst.above().mouse_scroll(env, cursor.clone(), amount) {
-            return EventStatus::Handled;
-        }
-        inst.below().mouse_scroll(env, cursor, amount)
-    }
-
-    fn mouse_down<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        cursor: impl Cursor<'a, Env> + Clone,
-        button: MouseButton,
-    ) -> EventStatus {
-        if let EventStatus::Handled = inst.above().mouse_down(env, cursor.clone(), button) {
-            return EventStatus::Handled;
-        }
-        inst.below().mouse_down(env, cursor, button)
-    }
-
-    fn focus<'a>(
-        inst: WidgetInst<'a, '_, Self>,
-        env: &mut Env,
-        keyboard: impl Keyboard<'a, Env> + Clone,
-        backward: bool,
-    ) -> EventStatus {
-        if let EventStatus::Handled = inst.above().focus(env, keyboard.clone(), backward) {
-            return EventStatus::Handled;
-        }
-        inst.below().focus(env, keyboard, backward)
     }
 }
 
-/// Contains extension methods for [`WidgetInst`]s of an [`Overlay`] widget.
-pub trait OverlayInstExt<'a, 'b, Below: WidgetBase, Above: WidgetBase> {
-    /// Gets the [`WidgetInst`] for the lower widget in the overlay.
-    fn below(&self) -> WidgetInst<'a, 'b, Below>;
-
-    /// Gets the [`WidgetInst`] for the higher widget in the overlay.
-    fn above(&self) -> WidgetInst<'a, 'b, Above>;
+/// A [`WidgetInst`] for an [`Overlay`] widget.
+struct OverlayInst<Below, Above> {
+    below: Below,
+    above: Above,
 }
 
-impl<'a, 'b, Below: WidgetBase, Above: WidgetBase> OverlayInstExt<'a, 'b, Below, Above>
-    for WidgetInst<'a, 'b, Overlay<Below, Above>>
+impl<Env: WidgetEnvironment + ?Sized, Below: WidgetInst<Env>, Above: WidgetInst<Env>>
+    WidgetInst<Env> for OverlayInst<Below, Above>
 {
-    fn below(&self) -> WidgetInst<'a, 'b, Below> {
-        WidgetInst {
-            widget: &self.widget.below,
-            min: self.min,
-            layout: self.layout.below.borrow(),
+    fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
+        self.below.draw(env, drawer);
+        self.above.draw(env, drawer);
+    }
+
+    fn cursor_event(
+        &self,
+        env: &mut Env,
+        pos: Vector2i,
+        event: CursorEvent,
+    ) -> CursorEventResponse<Env> {
+        let above_response = self.above.cursor_event(env, pos, event);
+        if let CursorEventResponse::Bubble = above_response {
+            self.below.cursor_event(env, pos, event)
+        } else {
+            above_response
         }
     }
 
-    fn above(&self) -> WidgetInst<'a, 'b, Above> {
-        WidgetInst {
-            widget: &self.widget.above,
-            min: self.min,
-            layout: self.layout.above.borrow(),
+    fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>> {
+        if backward {
+            self.below.focus(env, backward).or_else(|| self.above.focus(env, backward))
+        } else {
+            self.above.focus(env, backward).or_else(|| self.below.focus(env, backward))
         }
     }
 }
