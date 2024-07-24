@@ -330,6 +330,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
         // Begin main loop
         let mut cursor_pos = None;
         let mut prev_time = std::time::Instant::now();
+        let mut is_cursor_locked = false;
         event_loop.run(move |event, _, control_flow| {
             use winit::event::*;
             use winit::event_loop::*;
@@ -344,6 +345,9 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             app.update(env, (cur_time - prev_time).try_into().unwrap());
             prev_time = cur_time;
             *control_flow = ControlFlow::Poll;
+
+            // Respond to event
+            #[allow(clippy::collapsible_match)]
             match event {
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::Resized(n_size) => {
@@ -415,6 +419,22 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     _ => {}
                 },
+                Event::DeviceEvent { event, .. } =>
+                {
+                    #[allow(clippy::single_match)]
+                    match event {
+                        DeviceEvent::MouseMotion { delta } => {
+                            process_cursor_event(
+                                env,
+                                Extender::as_ref(&inst),
+                                &handlers,
+                                cursor_pos,
+                                CursorEvent::Motion(vec2(delta.0 as Scalar, -delta.1 as Scalar)),
+                            );
+                        }
+                        _ => {}
+                    }
+                }
                 Event::MainEventsCleared => {
                     window.request_redraw();
                 }
@@ -458,6 +478,27 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                     }
                 }
                 _ => {}
+            }
+
+            // Update UI state
+            let n_is_cursor_locked = handlers.with_ref(env, |handlers| {
+                handlers
+                    .cursor()
+                    .map_or(false, |handler| handler.is_locked(env))
+            });
+            if n_is_cursor_locked != is_cursor_locked {
+                is_cursor_locked = n_is_cursor_locked;
+                if is_cursor_locked {
+                    let _ = window
+                        .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                        .or_else(|_e| {
+                            window.set_cursor_grab(winit::window::CursorGrabMode::Locked)
+                        });
+                    window.set_cursor_visible(false);
+                } else {
+                    let _ = window.set_cursor_grab(winit::window::CursorGrabMode::None);
+                    window.set_cursor_visible(true);
+                }
             }
         });
     };

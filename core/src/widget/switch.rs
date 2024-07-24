@@ -156,6 +156,10 @@ impl<'ui, Back: ?Sized + 'ui, Env: WidgetEnvironment + ?Sized + 'ui>
     CursorInteractionHandler<'ui, Env>
     for Dependent<Back, Rc<dyn CursorInteractionHandler<'ui, Env> + 'ui>>
 {
+    fn is_locked(&self, env: &Env) -> bool {
+        self.front.is_locked(env)
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,

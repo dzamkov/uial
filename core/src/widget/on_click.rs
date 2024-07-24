@@ -107,6 +107,10 @@ impl<
         T: WidgetInst<Env>,
     > CursorInteractionHandler<'ui, Env> for OnClickInst<'_, F, S, T>
 {
+    fn is_locked(&self, _: &Env) -> bool {
+        true
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,

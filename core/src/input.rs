@@ -1,8 +1,12 @@
-use crate::{Vector2i, WidgetEnvironment};
+use crate::{Vector2i, Vector2, WidgetEnvironment};
 use std::rc::Rc;
 
 /// A widget-specific event handler for a cursor interaction.
 pub trait CursorInteractionHandler<'ui, Env: WidgetEnvironment + ?Sized> {
+    /// Indicates whether the cursor should be "locked" as part of this interaction. If so, it
+    /// will be hidden and confined to the window.
+    fn is_locked(&self, env: &Env) -> bool;
+
     /// Processes a cursor-specific event.
     fn cursor_event(
         &self,
@@ -136,6 +140,9 @@ pub enum CursorEvent {
 
     /// The mouse wheel has been scrolled.
     MouseScroll(MouseScrollDelta),
+
+    /// The cursor has moved by a given amount.
+    Motion(Vector2),
 }
 
 /// Describes an event that is not associated with a spatial location in the user interface.
@@ -161,6 +168,10 @@ pub struct Key {
 impl<'ui, Env: WidgetEnvironment + ?Sized, T: CursorInteractionHandler<'ui, Env> + ?Sized>
     CursorInteractionHandler<'ui, Env> for &T
 {
+    fn is_locked(&self, env: &Env) -> bool {
+        (**self).is_locked(env)
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,
