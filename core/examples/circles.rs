@@ -49,7 +49,7 @@ fn main() {
                 }
             })
             .on_key(move |env, key| {
-                match key.virtual_key_code {
+                match key.key_code {
                     Some(winit::event::VirtualKeyCode::R) => {
                         (&camera).current().set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));
                         true

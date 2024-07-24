@@ -380,7 +380,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                             GeneralEvent::Key {
                                 key: Key {
                                     scan_code: input.scancode,
-                                    virtual_key_code: input.virtual_keycode,
+                                    key_code: input.virtual_keycode,
                                 },
                                 is_down: input.state == ElementState::Pressed,
                             },
