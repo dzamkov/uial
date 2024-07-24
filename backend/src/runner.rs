@@ -1,6 +1,7 @@
 use crate::wgpu::*;
 use ::wgpu;
 use std::cell::Cell;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 use uial::drawer::*;
 use uial::*;
@@ -63,6 +64,7 @@ struct RawRunEnv<'state, S: HasReact + Track + 'static> {
     image_atlas: &'static WgpuImageAtlas<'static>,
     drawer_context: &'static WgpuDrawerContext<'static>,
     state: &'state mut S,
+    keys_held: &'state ReactCell<S::React, BTreeSet<KeyCode>>,
 }
 
 impl<S: HasReact + Track> HasWgpuContext<'static> for RunEnv<S> {
@@ -116,6 +118,11 @@ impl<S: HasReact + Track> Track for RunEnv<S> {
 
 impl<S: HasReact + Track> WidgetEnvironment for RunEnv<S> {
     type Drawer = WgpuErasedDrawer;
+    fn is_key_down(&self, key: KeyCode) -> bool {
+        self.raw
+            .keys_held
+            .with_ref(self, |keys_held| keys_held.contains(&key))
+    }
 }
 
 struct RunWidgetSlot<S: HasReact + Track + 'static> {
@@ -270,6 +277,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             Extender::as_ref(&image_atlas),
             draw_format,
         ));
+        let keys_held = state.react().new_cell(BTreeSet::new());
 
         // Initialize application
         let mut app = Extender::new(app);
@@ -277,11 +285,13 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             image_atlas: Extender::as_ref(&image_atlas),
             drawer_context: Extender::as_ref(&drawer_context),
             state: &mut state,
+            keys_held: &keys_held,
         })));
         let sizing = widget.sizing(RunEnv::from_raw(&RawRunEnv {
             image_atlas: Extender::as_ref(&image_atlas),
             drawer_context: Extender::as_ref(&drawer_context),
             state: &mut state,
+            keys_held: &keys_held,
         }));
 
         // Apply min/max window size
@@ -318,6 +328,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 image_atlas: Extender::as_ref(&image_atlas),
                 drawer_context: Extender::as_ref(&drawer_context),
                 state: &mut state,
+                keys_held: &keys_held,
             }),
             RunWidgetSlot {
                 size: Extender::as_ref(&size),
@@ -339,6 +350,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 image_atlas: Extender::as_ref(&image_atlas),
                 drawer_context: Extender::as_ref(&drawer_context),
                 state: &mut state,
+                keys_held: &keys_held,
             };
             let env = RunEnv::from_raw_mut(&mut raw_env);
             let cur_time = std::time::Instant::now();
@@ -373,6 +385,15 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                         }
                     }
                     WindowEvent::KeyboardInput { input, .. } => {
+                        if let Some(key_code) = input.virtual_keycode {
+                            keys_held.with_mut(env, |keys_held| {
+                                if input.state == ElementState::Pressed {
+                                    keys_held.insert(key_code);
+                                } else {
+                                    keys_held.remove(&key_code);
+                                }
+                            });
+                        }
                         process_general_event(
                             env,
                             &handlers,

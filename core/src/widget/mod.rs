@@ -125,6 +125,9 @@ pub trait WidgetEnvironment {
     /// The type of drawing interface provided to [`Widget`]s to draw themselves in this
     /// environment.
     type Drawer: ?Sized;
+
+    /// Determines whether the given keyboard key is currently pressed.
+    fn is_key_down(&self, key: KeyCode) -> bool;
 }
 
 impl<T: WidgetBase + ?Sized> WidgetBase for Rc<T> {}
