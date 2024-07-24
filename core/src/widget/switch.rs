@@ -80,7 +80,7 @@ impl<
     > SwitchInst<'a, P, T, Env, Slot>
 {
     /// Gets the current [`WidgetInst`] for the [`SwitchInst`].
-    fn inner<'b>(&'b self, env: &Env) -> &'b Rc<Dependent<T, dyn WidgetInst<Env> + 'a>> {
+    fn inner<'b>(&'b self, env: &'b Env) -> &'b Rc<Dependent<T, dyn WidgetInst<Env> + 'a>> {
         self.widget.0.with_ref(env, |cur_widget| {
             let cache: &'b _ = unsafe { &*self.cache.get() };
 
@@ -132,31 +132,29 @@ impl<
         pos: Vector2i,
         event: CursorEvent,
     ) -> CursorEventResponse<Env> {
-        let inner = self.inner(env);
-        match inner.front.cursor_event(env, pos, event) {
+        let inner = self.inner(env).clone();
+        let res = match inner.front.cursor_event(env, pos, event) {
             CursorEventResponse::Handled => CursorEventResponse::Handled,
             CursorEventResponse::Start(req) => {
-                // Wrap the handler in a `Dependent` to ensure that the `WidgetInst` is kept alive
-                // while the interaction is active
-                CursorEventResponse::Start(CursorInteractionRequest {
-                    scope: req.scope,
-                    handler: Rc::new(Dependent {
-                        back: ManuallyDrop::new(inner.clone()),
-                        front: ManuallyDrop::new(unsafe { std::mem::transmute(req.handler) }),
-                    }),
-                })
+                CursorEventResponse::Start(unsafe { wrap_cursor_interaction(&inner, req) })
             }
             CursorEventResponse::Bubble => CursorEventResponse::Bubble,
-        }
+        };
+        res
     }
 
     fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>> {
-        todo!()
+        let inner = self.inner(env).clone();
+        inner
+            .front
+            .focus(env, backward)
+            .map(|req| unsafe { wrap_focus_interaction(&inner, req) })
     }
 }
 
-impl<'ui, Back: ?Sized, Env: WidgetEnvironment + ?Sized> CursorInteractionHandler<'ui, Env>
-    for Dependent<Back, Box<dyn CursorInteractionHandler<'ui, Env> + 'ui>>
+impl<'ui, Back: ?Sized + 'ui, Env: WidgetEnvironment + ?Sized + 'ui>
+    CursorInteractionHandler<'ui, Env>
+    for Dependent<Back, Rc<dyn CursorInteractionHandler<'ui, Env> + 'ui>>
 {
     fn cursor_event(
         &self,
@@ -164,7 +162,20 @@ impl<'ui, Back: ?Sized, Env: WidgetEnvironment + ?Sized> CursorInteractionHandle
         pos: Vector2i,
         event: CursorEvent,
     ) -> CursorInteractionEventResponse<'ui, Env> {
-        todo!()
+        match self.front.cursor_event(env, pos, event) {
+            CursorInteractionEventResponse::Keep => CursorInteractionEventResponse::Keep,
+            CursorInteractionEventResponse::Replace(req) => {
+                CursorInteractionEventResponse::Replace(unsafe {
+                    wrap_cursor_interaction(&self.back, req)
+                })
+            }
+            CursorInteractionEventResponse::Downgrade(req) => {
+                CursorInteractionEventResponse::Downgrade(unsafe {
+                    wrap_focus_interaction(&self.back, req)
+                })
+            }
+            CursorInteractionEventResponse::End => CursorInteractionEventResponse::End,
+        }
     }
 
     fn general_event(
@@ -173,7 +184,87 @@ impl<'ui, Back: ?Sized, Env: WidgetEnvironment + ?Sized> CursorInteractionHandle
         pos: Vector2i,
         event: GeneralEvent,
     ) -> CursorInteractionEventResponse<'ui, Env> {
-        todo!()
+        match self.front.general_event(env, pos, event) {
+            CursorInteractionEventResponse::Keep => CursorInteractionEventResponse::Keep,
+            CursorInteractionEventResponse::Replace(req) => {
+                CursorInteractionEventResponse::Replace(unsafe {
+                    wrap_cursor_interaction(&self.back, req)
+                })
+            }
+            CursorInteractionEventResponse::Downgrade(req) => {
+                CursorInteractionEventResponse::Downgrade(unsafe {
+                    wrap_focus_interaction(&self.back, req)
+                })
+            }
+            CursorInteractionEventResponse::End => CursorInteractionEventResponse::End,
+        }
+    }
+}
+
+impl<'ui, Back: ?Sized + 'ui, Env: WidgetEnvironment + ?Sized + 'ui>
+    FocusInteractionHandler<'ui, Env>
+    for Dependent<Back, Rc<dyn FocusInteractionHandler<'ui, Env> + 'ui>>
+{
+    fn general_event(
+        &self,
+        env: &mut Env,
+        event: GeneralEvent,
+    ) -> FocusInteractionEventResponse<'ui, Env> {
+        match self.front.general_event(env, event) {
+            FocusInteractionEventResponse::Keep => FocusInteractionEventResponse::Keep,
+            FocusInteractionEventResponse::Replace(req) => {
+                FocusInteractionEventResponse::Replace(unsafe {
+                    wrap_focus_interaction(&self.back, req)
+                })
+            }
+            FocusInteractionEventResponse::End => FocusInteractionEventResponse::End,
+        }
+    }
+}
+
+/// Given a [`CursorInteractionRequest`] whose handler may contain references into a `Rc<T>` value,
+/// wraps it in a [`Dependent`] to ensure that the value is kept alive while the interaction is
+/// active.
+unsafe fn wrap_cursor_interaction<'a, 'b, T: ?Sized, Env: WidgetEnvironment + ?Sized>(
+    inner: &Rc<T>,
+    req: CursorInteractionRequest<'a, Env>,
+) -> CursorInteractionRequest<'b, Env>
+where
+    T: 'b,
+    Env: 'b,
+{
+    let handler: Rc<dyn CursorInteractionHandler<'a, Env> + 'a> = req.handler;
+    let handler: Rc<dyn CursorInteractionHandler<'b, Env> + 'b> =
+        unsafe { std::mem::transmute(handler) };
+    CursorInteractionRequest {
+        scope: req.scope,
+        handler: Rc::new(Dependent {
+            back: ManuallyDrop::new(inner.clone()),
+            front: ManuallyDrop::new(handler),
+        }),
+    }
+}
+
+/// Given a [`FocusInteractionRequest`] whose handler may contain references into a `Rc<T>` value,
+/// wraps it in a [`Dependent`] to ensure that the value is kept alive while the interaction is
+/// active.
+unsafe fn wrap_focus_interaction<'a, 'b, T: ?Sized, Env: WidgetEnvironment + ?Sized>(
+    inner: &Rc<T>,
+    req: FocusInteractionRequest<'a, Env>,
+) -> FocusInteractionRequest<'b, Env>
+where
+    T: 'b,
+    Env: 'b,
+{
+    let handler: Rc<dyn FocusInteractionHandler<'a, Env> + 'a> = req.handler;
+    let handler: Rc<dyn FocusInteractionHandler<'b, Env> + 'b> =
+        unsafe { std::mem::transmute(handler) };
+    FocusInteractionRequest {
+        scope: req.scope,
+        handler: Rc::new(Dependent {
+            back: ManuallyDrop::new(inner.clone()),
+            front: ManuallyDrop::new(handler),
+        }),
     }
 }
 
