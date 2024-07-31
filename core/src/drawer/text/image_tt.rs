@@ -340,7 +340,7 @@ impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
             let glyph_cache = self.family.glyph_images.read().unwrap();
             if let Some((image, image_offset)) = glyph_cache.get(&self.key) {
                 drawer.draw_image(
-                    image.view_all(),
+                    image.as_source(),
                     self.paint,
                     Similarity2i::translate(offset + *image_offset),
                 );
@@ -357,7 +357,7 @@ impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
             Entry::Occupied(entry) => {
                 let (image, image_offset) = entry.get();
                 drawer.draw_image(
-                    image.view_all(),
+                    image.as_source(),
                     self.paint,
                     Similarity2i::translate(offset + *image_offset),
                 );
@@ -366,7 +366,7 @@ impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
                 let image = self.family.image_manager.load_image(image.into());
                 let (image, _) = entry.insert((image, image_offset));
                 drawer.draw_image(
-                    image.view_all(),
+                    image.as_source(),
                     self.paint,
                     Similarity2i::translate(offset + image_offset),
                 );

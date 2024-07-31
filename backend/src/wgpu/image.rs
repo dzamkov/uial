@@ -49,18 +49,20 @@ impl<'a> WgpuImageAtlas<'a> {
 }
 
 impl ImageStore for WgpuImageAtlas<'_> {
-    type ImageRect = Box2i;
+    type Rect = Box2i;
 
-    fn image_rect_size(&self, view: Box2i) -> Size2i {
-        view.size()
+    fn image_size(&self, rect: Box2i) -> Size2i {
+        rect.size()
     }
 
-    fn image_rect_part(&self, view: Box2i, rect: Box2i) -> Option<Box2i> {
+    fn image_part(&self, rect: Box2i, sub: Box2i) -> Option<Box2i> {
         // TODO: Bounds checking
-        Some(Box2i {
-            min: view.min + rect.min,
-            max_exclusive: view.min + rect.max_exclusive,
-        })
+        Some(
+            Box2i {
+                min: rect.min + sub.min,
+                max_exclusive: rect.min + sub.max_exclusive,
+            },
+        )
     }
 }
 
@@ -107,10 +109,11 @@ pub struct WgpuImage<'a> {
     alloc: guillotiere::Allocation,
 }
 
-impl<'a> AsImageView<WgpuImageAtlas<'a>> for WgpuImage<'a> {
-    fn view_all(&self) -> ImageView<WgpuImageAtlas<'a>> {
+impl<'a> Image for WgpuImage<'a> {
+    type Store = WgpuImageAtlas<'a>;
+    fn as_source(&self) -> ImageSource<Self::Store> {
         let rect = self.alloc.rectangle;
-        ImageView::new(
+        ImageSource::new(
             self.atlas,
             Box2i::from_min_max(vec2i(rect.min.x, rect.min.y), vec2i(rect.max.x, rect.max.y)),
         )

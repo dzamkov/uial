@@ -223,7 +223,7 @@ impl<'a> WgpuDrawerContext<'a> {
         inner: impl FnOnce(&mut WgpuDrawer<'pass>),
     ) {
         // Get central UV for solid white image
-        let white_image = self.white_image.view_all();
+        let white_image = self.white_image.as_source();
         let white_uv = (white_image.rect().min.into_float() + vec2(0.5, 0.5))
             / white_image.store().texture_size as Scalar;
 
@@ -655,7 +655,7 @@ impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuDrawer<'_> {
     #[allow(clippy::identity_op)]
     fn draw_image(
         &mut self,
-        image: ImageView<WgpuImageAtlas<'_>>,
+        image: ImageSource<WgpuImageAtlas<'_>>,
         paint: Paint,
         trans: Similarity2i,
     ) {
