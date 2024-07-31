@@ -1,38 +1,36 @@
 mod image_tt;
 use super::*;
-use uial_geometry::Dir2i;
 pub use image_tt::*;
 use std::iter::Peekable;
 use std::marker::PhantomData;
+use uial_geometry::Dir2i;
 
 /// Describes a method of converting arbitrary strings of text into a form that can be drawn
-/// to a [`RasterDrawer`]. This fully  captures all information about the appearance/style of the
+/// to a [`RasterDrawer`]. This fully captures all information about the appearance/style of the
 /// text, including size, color and weight.
-pub trait Font {
-    /// The type of "glyph"s produced by this [`Font`].
-    type Glyph<'font>: ?Sized
-    where
-        Self: 'font;
+pub trait FontBase {
+    /// Identifies a type of glyph that can be produced by this [`Font`].
+    type Glyph: ?Sized;
 
     /// Converts a stream of characters into glyphs using a [`TextWriter`].
-    fn write_to<'font>(
-        &'font self,
-        writer: &mut TextWriter<impl GlyphPlacer<Glyph = Self::Glyph<'font>>>,
+    fn write_to(
+        &self,
+        writer: &mut TextWriter<impl GlyphPlacer<Glyph = Self::Glyph>>,
         chars: &mut Peekable<impl Iterator<Item = char>>,
     );
 }
 
-/// Describes a primitive drawable unit for a [`Font`] which can be drawn to a certain type of
-/// [`RasterDrawer`]. The glyph includes shape, size, color and weight information, but does not
-/// include positioning information.
-pub trait Glyph<Drawer: RasterDrawer + ?Sized> {
-    /// Draws this [`Glyph`] to the given drawer at the given offset.
-    fn draw_to(&self, drawer: &mut Drawer, offset: Vector2i);
+/// Describes a method of converting arbitrary strings of text into a form that can be drawn
+/// to a given type of `Drawer`. This fully captures all information about the appearance/style of
+/// the text, including size, color and weight.
+pub trait Font<Drawer: RasterDrawer + ?Sized>: FontBase {
+    /// Draws a glyph to the given drawer at the given offset.
+    fn draw_glyph_to(&self, drawer: &mut Drawer, glyph: &Self::Glyph, offset: Vector2i);
 }
 
 /// An interface for placing glyphs.
 pub trait GlyphPlacer {
-    /// The type of [`Glyph`] accepted by this [`GlyphPlacer`].
+    /// The type of glyph accepted by this [`GlyphPlacer`].
     type Glyph: ?Sized;
 
     /// Gets a mutable reference to the last placed glyph, or [`None`] if this is unavailable
@@ -49,23 +47,14 @@ pub trait GlyphPlacer {
         Self::Glyph: Sized;
 }
 
-impl<T: Font + ?Sized> Font for &'_ T {
-    type Glyph<'font> = T::Glyph<'font>
-    where
-        Self: 'font;
-
-    fn write_to<'font>(
-        &'font self,
-        writer: &mut TextWriter<impl GlyphPlacer<Glyph = Self::Glyph<'font>>>,
+impl<T: FontBase + ?Sized> FontBase for &'_ T {
+    type Glyph = T::Glyph;
+    fn write_to(
+        &self,
+        writer: &mut TextWriter<impl GlyphPlacer<Glyph = Self::Glyph>>,
         chars: &mut Peekable<impl Iterator<Item = char>>,
     ) {
         (**self).write_to(writer, chars);
-    }
-}
-
-impl<T: Glyph<Drawer> + ?Sized, Drawer: RasterDrawer + ?Sized> Glyph<Drawer> for &'_ T {
-    fn draw_to(&self, drawer: &mut Drawer, offset: Vector2i) {
-        (**self).draw_to(drawer, offset)
     }
 }
 
@@ -111,36 +100,24 @@ pub struct TextWriter<T: ?Sized> {
 
 impl<T: GlyphPlacer> TextWriter<T> {
     /// Writes a string to this [`TextWriter`] using the given font.
-    pub fn write<'font, F: Font<Glyph<'font> = T::Glyph> + ?Sized>(
-        &mut self,
-        font: &'font F,
-        str: &str,
-    ) {
+    pub fn write<F: FontBase<Glyph = T::Glyph> + ?Sized>(&mut self, font: &F, str: &str) {
         font.write_to(self, &mut str.chars().peekable())
     }
 }
 
 /// A [`GlyphPlacer`] which immediately draws placed glyphs. This type of placer does not
 /// allow access to previously-placed glyphs. Thus, ligatures are not supported.
-#[repr(transparent)]
-pub struct ImmediateDrawPlacer<G: Glyph<Drawer> + ?Sized, Drawer: RasterDrawer + ?Sized> {
-    _marker: PhantomData<fn(&G)>,
-    target: Drawer,
+pub struct ImmediateDrawPlacer<'a, F: Font<Drawer>, Drawer: RasterDrawer + ?Sized> {
+    font: &'a F,
+    target: &'a mut Drawer,
 }
 
-impl<G: Glyph<Drawer> + ?Sized, Drawer: RasterDrawer + ?Sized> ImmediateDrawPlacer<G, Drawer> {
-    /// Constructs a reference to an [`ImmediateDrawPlacer`] from a reference to a drawer.
-    pub fn from_mut(target: &mut Drawer) -> &mut ImmediateDrawPlacer<G, Drawer> {
-        unsafe { std::mem::transmute(target) }
-    }
-}
-
-impl<G: Glyph<Drawer> + ?Sized, Drawer: RasterDrawer + ?Sized> GlyphPlacer
-    for ImmediateDrawPlacer<G, Drawer>
+impl<'a, F: Font<Drawer>, Drawer: RasterDrawer + ?Sized> GlyphPlacer
+    for ImmediateDrawPlacer<'a, F, Drawer>
 {
-    type Glyph = G;
+    type Glyph = F::Glyph;
 
-    fn peek_last(&mut self) -> Option<&mut (Vector2i, G)> {
+    fn peek_last(&mut self) -> Option<&mut (Vector2i, F::Glyph)> {
         None
     }
 
@@ -148,11 +125,11 @@ impl<G: Glyph<Drawer> + ?Sized, Drawer: RasterDrawer + ?Sized> GlyphPlacer
         false
     }
 
-    fn place(&mut self, offset: Vector2i, glyph: G)
+    fn place(&mut self, offset: Vector2i, glyph: F::Glyph)
     where
         Self::Glyph: Sized,
     {
-        glyph.draw_to(&mut self.target, offset)
+        self.font.draw_glyph_to(self.target, &glyph, offset)
     }
 }
 
@@ -161,47 +138,45 @@ pub trait TextDrawer: RasterDrawer {
     /// Draws a string of text to this [`TextDrawer`] without buffering [`Glyph`]s. This is
     /// very fast, but does not allow for alignment, wrapping or advanced text rendering
     /// features such as ligatures.
-    fn draw_text_immediate<'font, F: Font>(
+    fn draw_text_immediate<F: Font<Self>>(
         &mut self,
-        font: &'font F,
+        font: &F,
         dir: Dir2i,
         offset: Vector2i,
         str: &str,
-    ) where
-        F::Glyph<'font>: Glyph<Self>,
-    {
+    ) {
         let mut writer = TextWriter {
             dir,
             pen: vec2(offset.x as Scalar, offset.y as Scalar),
             line_size: 0.0,
-            target: ImmediateDrawPlacer::from_mut(self),
+            target: ImmediateDrawPlacer { font, target: self },
         };
         writer.write(font, str);
     }
 
     /// Shortcut for [`TextDrawer::draw_text_immediate`] for left-to-right text.
-    fn draw_text_immediate_ltr<'font, F: Font>(
-        &mut self,
-        font: &'font F,
-        offset: Vector2i,
-        str: &str,
-    ) where
-        F::Glyph<'font>: Glyph<Self>,
-    {
+    fn draw_text_immediate_ltr<F: Font<Self>>(&mut self, font: &F, offset: Vector2i, str: &str) {
         self.draw_text_immediate(font, Dir2i::PosX, offset, str)
     }
 
     /// Draws text to this [`TextDrawer`] from a [`TextBuffer`].
-    fn draw_text_buffer<G: Glyph<Self>>(&mut self, offset: Vector2i, buffer: &TextBuffer<G>) {
+    fn draw_text_buffer<F: Font<Self>>(
+        &mut self,
+        font: &F,
+        offset: Vector2i,
+        buffer: &TextBuffer<F::Glyph>,
+    ) where
+        F::Glyph: Sized,
+    {
         for (glyph_offset, glyph) in buffer.glyphs() {
-            glyph.draw_to(self, offset + glyph_offset)
+            font.draw_glyph_to(self, glyph, offset + glyph_offset)
         }
     }
 }
 
 impl<T: RasterDrawer + ?Sized> TextDrawer for T {}
 
-/// A buffer for positioned [`Glyph`]s.
+/// A buffer for positioned glyphs.
 pub struct TextBuffer<G> {
     glyphs: Vec<(Vector2i, G)>,
 }
@@ -215,6 +190,11 @@ impl<G> TextBuffer<G> {
     /// Iterates over the glyphs in this buffer.
     pub fn glyphs(&self) -> impl Iterator<Item = (Vector2i, &G)> {
         self.glyphs.iter().map(|(offset, glyph)| (*offset, glyph))
+    }
+
+    /// Clears this buffer.
+    pub fn clear(&mut self) {
+        self.glyphs.clear()
     }
 }
 

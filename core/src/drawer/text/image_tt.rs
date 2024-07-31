@@ -21,7 +21,7 @@ pub struct ImageTTFontFamily<M: ImageManager> {
     face: MaybeUninit<FaceInfo<'static>>,
     image_manager: M,
     // TODO: Evict old entries from cache
-    glyph_images: RwLock<HashMap<ImageTTGlyphKey, (M::Image, Vector2i)>>,
+    glyph_images: RwLock<HashMap<ImageTTGlyph, (M::Image, Vector2i)>>,
 }
 
 /// Contains relevant information about the [`ttf_parser::Face`] for a [`ImageTTFont`].
@@ -52,18 +52,9 @@ enum GlyphRenderType {
     Vector,
 }
 
-/// A [`Glyph`] for an [`ImageTTFont`].
-#[derive(Clone, Copy)]
-pub struct ImageTTGlyph<'a, M: ImageManager> {
-    family: &'a ImageTTFontFamily<M>,
-    key: ImageTTGlyphKey,
-    paint: Paint,
-}
-
-/// Encapsulates the properties of [`ImageTTGlyph`] that are used to identify a rasterized image
-/// of a glyph in a cache.
+/// A glyph for an [`ImageTTFont`].
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-struct ImageTTGlyphKey {
+pub struct ImageTTGlyph {
     glyph_id: ttf_parser::GlyphId,
     pixels_per_4_em: u16,
     sub_pixel_x: u8,
@@ -261,19 +252,16 @@ impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> ImageTTFont<M, Famil
     }
 }
 
-impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> Font for ImageTTFont<M, Family> {
-    type Glyph<'font> = ImageTTGlyph<'font, M> where Self: 'font;
-    fn write_to<'font>(
-        &'font self,
-        writer: &mut TextWriter<impl GlyphPlacer<Glyph = ImageTTGlyph<'font, M>>>,
+impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> FontBase for ImageTTFont<M, Family> {
+    type Glyph = ImageTTGlyph;
+
+    fn write_to(
+        &self,
+        writer: &mut TextWriter<impl GlyphPlacer<Glyph = ImageTTGlyph>>,
         chars: &mut Peekable<impl Iterator<Item = char>>,
     ) {
-        let family = self.family.borrow();
-        let mut last_glyph_id = writer
-            .target
-            .peek_last()
-            .filter(|(_, glyph)| std::ptr::eq(glyph.family, family))
-            .map(|(_, glyph)| glyph.key.glyph_id);
+        let family: &ImageTTFontFamily<M> = self.family.borrow();
+        let mut last_glyph_id = writer.target.peek_last().map(|(_, glyph)| glyph.glyph_id);
         let mut any_glyph = false;
         let face = family.face();
         #[allow(clippy::while_let_on_iterator)]
@@ -291,14 +279,10 @@ impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> Font for ImageTTFont
                         writer.target.place(
                             vec2i(offset_x, offset_y),
                             ImageTTGlyph {
-                                family,
-                                key: ImageTTGlyphKey {
-                                    glyph_id,
-                                    pixels_per_4_em: self.pixels_per_4_em,
-                                    sub_pixel_x,
-                                    sub_pixel_y,
-                                },
-                                paint: self.paint,
+                                glyph_id,
+                                pixels_per_4_em: self.pixels_per_4_em,
+                                sub_pixel_x,
+                                sub_pixel_y,
                             },
                         );
                     }
@@ -331,14 +315,19 @@ impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> Font for ImageTTFont
     }
 }
 
-impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
-    for ImageTTGlyph<'_, M>
+impl<
+        M: ImageManager,
+        Family: Borrow<ImageTTFontFamily<M>>,
+        Drawer: ImageDrawer<M::Store> + ?Sized,
+    > Font<Drawer> for ImageTTFont<M, Family>
 {
-    fn draw_to(&self, drawer: &mut Drawer, offset: Vector2i) {
+    fn draw_glyph_to(&self, drawer: &mut Drawer, glyph: &ImageTTGlyph, offset: Vector2i) {
+        let family: &ImageTTFontFamily<M> = self.family.borrow();
+
         // Check cache
         {
-            let glyph_cache = self.family.glyph_images.read().unwrap();
-            if let Some((image, image_offset)) = glyph_cache.get(&self.key) {
+            let glyph_cache = family.glyph_images.read().unwrap();
+            if let Some((image, image_offset)) = glyph_cache.get(glyph) {
                 drawer.draw_image(
                     image.as_source(),
                     self.paint,
@@ -349,11 +338,11 @@ impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
         }
 
         // Rasterize glyph while cache is unlocked
-        let (image, image_offset) = rasterize(self.family.face(), &self.key);
+        let (image, image_offset) = rasterize(family.face(), glyph);
 
         // Lock to prevent loading the image multiple times in a race condition.
-        let mut glyph_cache = self.family.glyph_images.write().unwrap();
-        match glyph_cache.entry(self.key) {
+        let mut glyph_cache = family.glyph_images.write().unwrap();
+        match glyph_cache.entry(*glyph) {
             Entry::Occupied(entry) => {
                 let (image, image_offset) = entry.get();
                 drawer.draw_image(
@@ -363,7 +352,7 @@ impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
                 );
             }
             Entry::Vacant(entry) => {
-                let image = self.family.image_manager.load_image(image.into());
+                let image = family.image_manager.load_image(image.into());
                 let (image, _) = entry.insert((image, image_offset));
                 drawer.draw_image(
                     image.as_source(),
@@ -376,17 +365,17 @@ impl<M: ImageManager, Drawer: ImageDrawer<M::Store> + ?Sized> Glyph<Drawer>
 }
 
 /// Rasterizes a glyph.
-fn rasterize(face: &FaceInfo, key: &ImageTTGlyphKey) -> (image::GrayAlphaImage, Vector2i) {
-    let render_info = face.glyphs[usize::from(key.glyph_id.0)]
+fn rasterize(face: &FaceInfo, glyph: &ImageTTGlyph) -> (image::GrayAlphaImage, Vector2i) {
+    let render_info = face.glyphs[usize::from(glyph.glyph_id.0)]
         .render_info
         .as_ref()
         .unwrap();
     match render_info.render_type {
         GlyphRenderType::Raster => {
-            let pixels_per_em = key.pixels_per_4_em / 4;
+            let pixels_per_em = glyph.pixels_per_4_em / 4;
             let source_image = face
                 .source
-                .glyph_raster_image(key.glyph_id, pixels_per_em)
+                .glyph_raster_image(glyph.glyph_id, pixels_per_em)
                 .unwrap();
             if source_image.pixels_per_em != pixels_per_em {
                 // TODO: Scale raster image to different sizes
@@ -422,9 +411,9 @@ fn rasterize(face: &FaceInfo, key: &ImageTTGlyphKey) -> (image::GrayAlphaImage, 
         GlyphRenderType::Vector => {
             let bbox = render_info.bounding_box;
             let scale_factor =
-                (key.pixels_per_4_em as f32) / (4.0 * face.source.units_per_em() as f32);
-            let sub_pixel_x = unquantize_pixel_offset(key.sub_pixel_x);
-            let sub_pixel_y = unquantize_pixel_offset(key.sub_pixel_y);
+                (glyph.pixels_per_4_em as f32) / (4.0 * face.source.units_per_em() as f32);
+            let sub_pixel_x = unquantize_pixel_offset(glyph.sub_pixel_x);
+            let sub_pixel_y = unquantize_pixel_offset(glyph.sub_pixel_y);
             let min_x = (bbox.x_min as f32 * scale_factor + sub_pixel_x).floor() as i32;
             let min_y = (bbox.y_min as f32 * scale_factor + sub_pixel_y).floor() as i32;
             let max_x = (bbox.x_max as f32 * scale_factor + sub_pixel_x).ceil() as i32;
@@ -441,7 +430,7 @@ fn rasterize(face: &FaceInfo, key: &ImageTTGlyphKey) -> (image::GrayAlphaImage, 
                 last: Default::default(),
                 target: ab_glyph_rasterizer::Rasterizer::new(width as usize, height as usize),
             };
-            face.source.outline_glyph(key.glyph_id, &mut rasterizer);
+            face.source.outline_glyph(glyph.glyph_id, &mut rasterizer);
 
             // Explicitly close the glyph if it has not yet been closed
             ttf_parser::OutlineBuilder::close(&mut rasterizer);

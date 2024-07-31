@@ -10,6 +10,7 @@ mod pad;
 mod restrict;
 mod stack;
 mod switch;
+mod label;
 mod zoom_canvas;
 
 use super::*;
@@ -26,6 +27,7 @@ pub use restrict::*;
 pub use stack::*;
 use std::rc::Rc;
 pub use switch::*;
+pub use label::*;
 pub use zoom_canvas::*;
 
 /// A trait which all [`Widget`]s must implement.
