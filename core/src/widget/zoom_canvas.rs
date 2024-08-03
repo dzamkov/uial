@@ -207,6 +207,10 @@ impl<
         (self.widget.draw)(env, &mut Transform::new(drawer, proj))
     }
 
+    fn identify(&self, _: &Env, _: Vector2i) -> Option<WidgetId> {
+        None
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,

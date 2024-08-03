@@ -6,6 +6,7 @@ mod prop;
 pub mod react;
 mod sizing;
 mod time;
+mod unique;
 pub mod widget;
 
 pub use cache::*;
@@ -15,14 +16,15 @@ pub use prop::*;
 pub use react::{DefaultReact, HasReact, React, ReactCell};
 pub use sizing::*;
 pub use time::*;
-pub use uial_geometry::{size2i, vec2i, Box2i, Padding2i, Point2i, Similarity2i, Size2i, Vector2i};
+pub use uial_geometry::{size2i, vec2i, Box2i, Padding2i, Point2i, Ortho2i, Size2i, Vector2i};
 pub use uial_geometry::{vec2, Box2, Scalar, Vector2, PI};
 pub use uial_geometry::{Duration, Instant};
 
+pub use widget::CursorEventResponse;
 pub use widget::DynWidget;
-pub use widget::{OnClickWidgetExt, OnKeyWidgetExt};
 pub use widget::{ExtendWidgetExt, PadWidgetExt, RestrictWidgetExt, SwitchWidgetExt};
-pub use widget::{Widget, WidgetBase, WidgetEnvironment, WidgetInst, WidgetSlot};
+pub use widget::{OnClickWidgetExt, OnKeyWidgetExt};
+pub use widget::{Widget, WidgetBase, WidgetEnvironment, WidgetInst, WidgetSlot, WidgetId};
 
 /// Re-exports of the [`uial_geometry`] crate.
 pub mod geometry {

@@ -9,7 +9,7 @@ use uial::*;
 /// Describes a self-contained application.
 pub trait Application {
     /// Encapsulates the time-varying state of the application at any given moment.
-    type State: HasReact + Track;
+    type State: HasReact + HasClock + Track;
 
     /// Gets the title of the application.
     fn title(&self) -> &str;
@@ -65,6 +65,8 @@ struct RawRunEnv<'state, S: HasReact + Track + 'static> {
     drawer_context: &'static WgpuDrawerContext<'static>,
     state: &'state mut S,
     keys_held: &'state ReactCell<S::React, BTreeSet<KeyCode>>,
+    handlers: &'state ReactCell<S::React, InteractionHandlerSet<'static, RunEnv<S>>>,
+    hover_feedback: Option<HoverFeedback>,
 }
 
 impl<S: HasReact + Track> HasWgpuContext<'static> for RunEnv<S> {
@@ -122,6 +124,15 @@ impl<S: HasReact + Track> WidgetEnvironment for RunEnv<S> {
         self.raw
             .keys_held
             .with_ref(self, |keys_held| keys_held.contains(&key))
+    }
+
+    fn interaction_feedback(&self, f: &mut dyn FnMut(&dyn std::any::Any)) {
+        if let Some(hover_feedback) = &self.raw.hover_feedback {
+            f(hover_feedback);
+        }
+        self.raw
+            .handlers
+            .with_ref(self, |handlers| handlers.feedback(self, f));
     }
 }
 
@@ -226,6 +237,16 @@ impl<'ui, Env: WidgetEnvironment + ?Sized> InteractionHandlerSet<'ui, Env> {
         self.cursor = None;
         self.focus.clear();
     }
+
+    /// Calls `f` for every feedback item for every interaction handler in this set.
+    pub fn feedback(&self, env: &Env, f: &mut dyn FnMut(&dyn std::any::Any)) {
+        if let Some(cursor) = &self.cursor {
+            cursor.handler.feedback(env, f);
+        }
+        for focus in &self.focus {
+            focus.handler.feedback(env, f);
+        }
+    }
 }
 
 /// Identifies some kind of interaction handler.
@@ -279,6 +300,9 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
         ));
         let keys_held = state.react().new_cell(BTreeSet::new());
 
+        // Initialize interaction handlers
+        let mut handlers = Extender::new(state.react().new_cell(InteractionHandlerSet::new()));
+
         // Initialize application
         let mut app = Extender::new(app);
         let widget = Extender::new(Extender::as_ref(&app).body(RunEnv::from_raw(&RawRunEnv {
@@ -286,12 +310,16 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             drawer_context: Extender::as_ref(&drawer_context),
             state: &mut state,
             keys_held: &keys_held,
+            handlers: Extender::as_ref(&handlers),
+            hover_feedback: None,
         })));
         let sizing = widget.sizing(RunEnv::from_raw(&RawRunEnv {
             image_atlas: Extender::as_ref(&image_atlas),
             drawer_context: Extender::as_ref(&drawer_context),
             state: &mut state,
             keys_held: &keys_held,
+            handlers: Extender::as_ref(&handlers),
+            hover_feedback: None,
         }));
 
         // Apply min/max window size
@@ -329,17 +357,17 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 drawer_context: Extender::as_ref(&drawer_context),
                 state: &mut state,
                 keys_held: &keys_held,
+                handlers: Extender::as_ref(&handlers),
+                hover_feedback: None,
             }),
             RunWidgetSlot {
                 size: Extender::as_ref(&size),
             },
         ));
 
-        // Initialize interaction handlers
-        let mut handlers = Extender::new(state.react().new_cell(InteractionHandlerSet::new()));
-
         // Begin main loop
         let mut cursor_pos = None;
+        let mut hover_feedback = None;
         let mut prev_time = std::time::Instant::now();
         let mut is_cursor_locked = false;
         event_loop.run(move |event, _, control_flow| {
@@ -351,6 +379,8 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 drawer_context: Extender::as_ref(&drawer_context),
                 state: &mut state,
                 keys_held: &keys_held,
+                handlers: Extender::as_ref(&handlers),
+                hover_feedback,
             };
             let env = RunEnv::from_raw_mut(&mut raw_env);
             let cur_time = std::time::Instant::now();
@@ -499,6 +529,36 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                     }
                 }
                 _ => {}
+            }
+
+            // Update hover feedback
+            if let Some(cursor_pos) = cursor_pos {
+                let has_cursor_interaction =
+                    handlers.with_ref(env, |handlers| handlers.cursor().is_some());
+                if !has_cursor_interaction {
+                    let hover_widget = inst.identify(env, cursor_pos);
+                    if let Some(hover_widget) = hover_widget {
+                        if let Some(hover_feedback) = &mut hover_feedback {
+                            hover_feedback.pos = cursor_pos;
+                            if hover_feedback.widget != hover_widget {
+                                hover_feedback.widget = hover_widget;
+                                hover_feedback.since = env.clock();
+                            }
+                        } else {
+                            hover_feedback = Some(HoverFeedback {
+                                widget: hover_widget,
+                                pos: cursor_pos,
+                                since: env.clock(),
+                            });
+                        }
+                    } else {
+                        hover_feedback = None;
+                    }
+                } else {
+                    hover_feedback = None;
+                }
+            } else {
+                hover_feedback = None;
             }
 
             // Update UI state

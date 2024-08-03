@@ -1,0 +1,11 @@
+[package]
+name = "uial-widgets"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uial = { path = "../core" }
+image = "0.24.6"
+
+[dev-dependencies]
+uial-backend = { path = "../backend" }

@@ -62,6 +62,10 @@ impl<
         self.inner.draw(env, drawer)
     }
 
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+        self.inner.identify(env, pos)
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,
@@ -139,5 +143,9 @@ impl<
     ) -> CursorInteractionEventResponse<'ui, Env> {
         self.slot.bubble_general_event(env, event);
         CursorInteractionEventResponse::Keep
+    }
+
+    fn feedback(&self, _: &Env, _: &mut dyn FnMut(&dyn Any)) {
+        // No feedback
     }
 }

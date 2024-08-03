@@ -1,4 +1,5 @@
-use crate::{Vector2i, Vector2, WidgetEnvironment};
+use crate::{Vector2, Vector2i, WidgetEnvironment, WidgetId, Instant};
+use std::any::Any;
 use std::rc::Rc;
 
 /// A widget-specific event handler for a cursor interaction.
@@ -22,6 +23,11 @@ pub trait CursorInteractionHandler<'ui, Env: WidgetEnvironment + ?Sized> {
         pos: Vector2i,
         event: GeneralEvent,
     ) -> CursorInteractionEventResponse<'ui, Env>;
+
+    /// Calls `f` for each feedback item produced by this interaction.
+    ///
+    /// Interaction feedback can be accessed by calling [`WidgetEnvironment::interaction_feedback`].
+    fn feedback(&self, env: &Env, f: &mut dyn FnMut(&dyn Any));
 }
 
 /// A widget-specific event handler for a focus interaction.
@@ -32,6 +38,27 @@ pub trait FocusInteractionHandler<'ui, Env: WidgetEnvironment + ?Sized> {
         env: &mut Env,
         event: GeneralEvent,
     ) -> FocusInteractionEventResponse<'ui, Env>;
+
+    /// Calls `f` for each feedback item produced by this interaction.
+    ///
+    /// Interaction feedback can be accessed by calling [`WidgetEnvironment::interaction_feedback`].
+    fn feedback(&self, env: &Env, f: &mut dyn FnMut(&dyn Any)) {
+        // No feedback by default
+        let _ = (env, f);
+    }
+}
+
+/// A feedback item indicating that a widget is currently being hovered over.
+#[derive(Clone, Copy)]
+pub struct HoverFeedback {
+    /// The widget being hovered over.
+    pub widget: WidgetId,
+
+    /// The current position of the cursor.
+    pub pos: Vector2i,
+
+    /// The time at which the hover began.
+    pub since: Instant,
 }
 
 /// A possible response to a cursor interaction event.
@@ -191,6 +218,10 @@ impl<'ui, Env: WidgetEnvironment + ?Sized, T: CursorInteractionHandler<'ui, Env>
         event: GeneralEvent,
     ) -> CursorInteractionEventResponse<'ui, Env> {
         (**self).general_event(env, pos, event)
+    }
+
+    fn feedback(&self, env: &Env, f: &mut dyn FnMut(&dyn Any)) {
+        (**self).feedback(env, f)
     }
 }
 

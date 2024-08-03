@@ -57,10 +57,13 @@ impl ImageStore for WgpuImageAtlas<'_> {
 
     fn image_part(&self, rect: Box2i, sub: Box2i) -> Option<Box2i> {
         // TODO: Bounds checking
-        Some(Box2i {
-            min: rect.min + sub.min,
-            max_exclusive: rect.min + sub.max_exclusive,
-        })
+        Some(Box2i::from_min_size(
+            vec2i(
+                rect.min.x + sub.min.x,
+                rect.max_exclusive.y - sub.max_exclusive.y,
+            ),
+            sub.size(),
+        ))
     }
 }
 

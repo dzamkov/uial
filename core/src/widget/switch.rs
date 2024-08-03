@@ -126,6 +126,10 @@ impl<
         self.inner(env).front.draw(env, drawer)
     }
 
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+        self.inner(env).front.identify(env, pos)
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,
@@ -202,6 +206,10 @@ impl<'ui, Back: ?Sized + 'ui, Env: WidgetEnvironment + ?Sized + 'ui>
             }
             CursorInteractionEventResponse::End => CursorInteractionEventResponse::End,
         }
+    }
+
+    fn feedback(&self, env: &Env, f: &mut dyn FnMut(&dyn Any)) {
+        self.front.feedback(env, f)
     }
 }
 

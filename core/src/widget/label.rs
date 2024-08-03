@@ -1,5 +1,5 @@
 use super::*;
-use crate::drawer::{Font, RasterDrawer, TextBuffer, TextDrawer, TextWriter};
+use crate::drawer::{Font, FontBase, RasterDrawer, TextBuffer, TextDrawer, TextWriter};
 use uial_geometry::Dir2i;
 
 /// A [`Widget`] which displays a text label.
@@ -8,32 +8,45 @@ use uial_geometry::Dir2i;
 /// fit the text.
 pub struct Label<
     Env: WidgetEnvironment + Track + ?Sized,
-    F: Font<Env::Drawer>,
+    F: Property<Env>,
     T: Property<Env, Value = String>,
 > where
     Env::Drawer: RasterDrawer,
-    F::Glyph: Sized,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
 {
     font: F,
     dir: Dir2i,
     text: T,
-    text_buffer_cache: Cache<Env, (Size2i, TextBuffer<F::Glyph>)>,
+    #[allow(clippy::type_complexity)]
+    text_buffer_cache: Cache<Env, (Size2i, TextBuffer<<F::Value as FontBase>::Glyph>)>,
 }
 
 impl<
         Env: WidgetEnvironment + Track + ?Sized,
-        F: Font<Env::Drawer>,
+        F: Property<Env>,
         T: Property<Env, Value = String>,
     > Label<Env, F, T>
 where
     Env::Drawer: RasterDrawer,
-    F::Glyph: Sized,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
 {
+    /// Constructs a new [`Label`] widget.
+    pub fn new(font: F, text: T) -> Self {
+        Label {
+            font,
+            dir: Dir2i::PosX,
+            text,
+            text_buffer_cache: Cache::new(),
+        }
+    }
+
     /// Calls the given closure with a [`TextBuffer`] containing the arranged text of this label.
     fn with_text_buffer<R>(
         &self,
         env: &Env,
-        f: impl FnOnce(Size2i, &TextBuffer<F::Glyph>) -> R,
+        f: impl FnOnce(Size2i, &TextBuffer<<F::Value as FontBase>::Glyph>) -> R,
     ) -> R {
         self.text_buffer_cache.with(
             env,
@@ -50,8 +63,10 @@ where
                     line_size: 0.0,
                     target: &mut res,
                 };
-                self.text.with_ref(env, |text| {
-                    writer.write(&self.font, text);
+                self.font.with_ref(env, |font| {
+                    self.text.with_ref(env, |text| {
+                        writer.write(font, text);
+                    })
                 });
                 // TODO: Support for non-LTR text
                 let size = size2i(writer.pen.x.ceil() as u32, writer.line_size as u32);
@@ -70,13 +85,13 @@ pub fn label<
 >(
     font: F,
     text: T,
-) -> Label<Env, F, T>
+) -> Label<Env, Const<F>, T>
 where
     Env::Drawer: RasterDrawer,
     F::Glyph: Sized,
 {
     Label {
-        font,
+        font: const_(font),
         dir: Dir2i::PosX,
         text,
         text_buffer_cache: Cache::new(),
@@ -85,23 +100,25 @@ where
 
 impl<
         Env: WidgetEnvironment + Track + ?Sized,
-        F: Font<Env::Drawer>,
+        F: Property<Env>,
         T: Property<Env, Value = String>,
     > WidgetBase for Label<Env, F, T>
 where
     Env::Drawer: RasterDrawer,
-    F::Glyph: Sized,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
 {
 }
 
 impl<
         Env: WidgetEnvironment + Track + ?Sized,
-        F: Font<Env::Drawer>,
+        F: Property<Env>,
         T: Property<Env, Value = String>,
     > Widget<Env> for Label<Env, F, T>
 where
     Env::Drawer: RasterDrawer,
-    F::Glyph: Sized,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
 {
     fn sizing(&self, env: &Env) -> Sizing {
         self.with_text_buffer(env, |size, _| Sizing::exact(size))
@@ -119,12 +136,13 @@ where
 struct LabelInst<
     'a,
     Env: WidgetEnvironment + Track + ?Sized,
-    F: Font<Env::Drawer>,
+    F: Property<Env>,
     T: Property<Env, Value = String>,
     Slot,
 > where
     Env::Drawer: RasterDrawer,
-    F::Glyph: Sized,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
 {
     widget: &'a Label<Env, F, T>,
     slot: Slot,
@@ -133,19 +151,26 @@ struct LabelInst<
 impl<
         'a,
         Env: WidgetEnvironment + Track + ?Sized,
-        F: Font<Env::Drawer>,
+        F: Property<Env>,
         T: Property<Env, Value = String>,
         Slot: WidgetSlot<Env>,
     > WidgetInst<Env> for LabelInst<'a, Env, F, T, Slot>
 where
     Env::Drawer: RasterDrawer,
-    F::Glyph: Sized,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         let offset = self.slot.min(env);
-        self.widget.with_text_buffer(env, |_, buffer| {
-            drawer.draw_text_buffer(&self.widget.font, offset, buffer);
-        });
+        self.widget.font.with_ref(env, |font| {
+            self.widget.with_text_buffer(env, |_, buffer| {
+                drawer.draw_text_buffer(font, offset, buffer);
+            })
+        })
+    }
+
+    fn identify(&self, _: &Env, _: Vector2i) -> Option<WidgetId> {
+        None
     }
 
     fn cursor_event(&self, _: &mut Env, _: Vector2i, _: CursorEvent) -> CursorEventResponse<Env> {

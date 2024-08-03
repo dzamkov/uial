@@ -66,6 +66,10 @@ impl<Env: WidgetEnvironment + ?Sized, Below: WidgetInst<Env>, Above: WidgetInst<
         self.above.draw(env, drawer);
     }
 
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+        self.above.identify(env, pos).or_else(|| self.below.identify(env, pos))
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,

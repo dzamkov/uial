@@ -63,7 +63,7 @@ impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuErasedDrawer {
         &mut self,
         image: ImageSource<WgpuImageAtlas<'_>>,
         paint: Paint,
-        trans: Similarity2i,
+        trans: Ortho2i,
     ) {
         self.with_unerase_mut(|d| d.draw_image(image, paint, trans))
     }

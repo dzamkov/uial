@@ -160,7 +160,7 @@ pub trait TextDrawer: RasterDrawer {
     }
 
     /// Draws text to this [`TextDrawer`] from a [`TextBuffer`].
-    fn draw_text_buffer<F: Font<Self>>(
+    fn draw_text_buffer<F: Font<Self> + ?Sized>(
         &mut self,
         font: &F,
         offset: Vector2i,

@@ -115,6 +115,10 @@ impl<
         self.inner.draw(env, drawer)
     }
 
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+        self.inner.identify(env, pos)
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,

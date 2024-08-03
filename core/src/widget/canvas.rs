@@ -59,6 +59,10 @@ impl<
         (self.widget.draw)(env, self.slot.size(env), drawer)
     }
 
+    fn identify(&self, _: &Env, _: Vector2i) -> Option<WidgetId> {
+        None
+    }
+
     fn cursor_event(&self, _: &mut Env, _: Vector2i, _: CursorEvent) -> CursorEventResponse<Env> {
         CursorEventResponse::Bubble
     }

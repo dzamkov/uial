@@ -206,27 +206,63 @@ impl Padding2i {
 }
 
 /// A transform in discrete two-dimensional space consisting of rotation, translation, reflection
-/// and uniform scaling.
-#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
-pub struct Similarity2i {
+/// and non-uniform scaling, i.e. transformations that preserve angles.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct Ortho2i {
     // TODO: Rotation and scaling
     /// The offset for the translation component of this transform, applied after rotation and
     /// scaling.
     pub offset: Vector2i,
+
+    /// The scaling factor applied to each axis.
+    scaling: Vector2i,
 }
 
-impl Similarity2i {
-    /// Constructs a [`Similarity2i`] which translates by the given offset.
+impl Ortho2i {
+    /// The identity [`Ortho2i`].
+    pub const IDENTITY: Self = Self {
+        offset: vec2i(0, 0),
+        scaling: vec2i(1, 1),
+    };
+
+    /// Constructs a [`Ortho2i`] which translates by the given offset.
     #[inline]
     pub const fn translate(offset: Vector2i) -> Self {
-        Self { offset }
+        Self {
+            offset,
+            scaling: vec2i(1, 1),
+        }
+    }
+
+    /// Constructs a [`Ortho2i`] which scales by the given amount along each axis.
+    pub const fn scale(scaling: Vector2i) -> Self {
+        Self {
+            offset: vec2i(0, 0),
+            scaling,
+        }
     }
 }
 
-impl std::ops::Mul<Vector2i> for Similarity2i {
+impl std::ops::Mul<Vector2i> for Ortho2i {
     type Output = Vector2i;
-    #[allow(clippy::suspicious_arithmetic_impl)]
-    fn mul(self, point: Vector2i) -> Vector2i {
+    #[inline]
+    fn mul(self, mut point: Vector2i) -> Vector2i {
+        point.x *= self.scaling.x;
+        point.y *= self.scaling.y;
         point + self.offset
+    }
+}
+
+impl std::ops::Mul<Ortho2i> for Ortho2i {
+    type Output = Ortho2i;
+    #[inline]
+    fn mul(self, other: Ortho2i) -> Ortho2i {
+        Ortho2i {
+            offset: self * other.offset,
+            scaling: vec2i(
+                self.scaling.x * other.scaling.x,
+                self.scaling.y * other.scaling.y,
+            ),
+        }
     }
 }

@@ -260,6 +260,14 @@ impl<
         self.b.draw(env, drawer);
     }
 
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+        if self.shared.side(env, pos) {
+            self.b.identify(env, pos)
+        } else {
+            self.a.identify(env, pos)
+        }
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,

@@ -331,7 +331,7 @@ impl<
                 drawer.draw_image(
                     image.as_source(),
                     self.paint,
-                    Similarity2i::translate(offset + *image_offset),
+                    Ortho2i::translate(offset + *image_offset),
                 );
                 return;
             }
@@ -348,7 +348,7 @@ impl<
                 drawer.draw_image(
                     image.as_source(),
                     self.paint,
-                    Similarity2i::translate(offset + *image_offset),
+                    Ortho2i::translate(offset + *image_offset),
                 );
             }
             Entry::Vacant(entry) => {
@@ -357,7 +357,7 @@ impl<
                 drawer.draw_image(
                     image.as_source(),
                     self.paint,
-                    Similarity2i::translate(offset + image_offset),
+                    Ortho2i::translate(offset + image_offset),
                 );
             }
         }

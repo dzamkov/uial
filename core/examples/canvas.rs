@@ -41,7 +41,7 @@ fn main() {
                 d.draw_image(
                     ferris.as_source(),
                     Paint::new(1.0, 1.0, 1.0, 1.0),
-                    Similarity2i::translate(vec2i(100, 100)),
+                    Ortho2i::translate(vec2i(100, 100)),
                 );
                 d.draw_text_immediate_ltr::<ImageTTFont<_, _>>(
                     &(&font_family)

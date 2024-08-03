@@ -29,6 +29,7 @@ use std::rc::Rc;
 pub use switch::*;
 pub use label::*;
 pub use zoom_canvas::*;
+use std::any::Any;
 
 /// A trait which all [`Widget`]s must implement.
 ///
@@ -86,6 +87,12 @@ pub trait WidgetInst<Env: WidgetEnvironment + ?Sized> {
     /// Draws this [`WidgetInst`] to the given drawer.
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer);
 
+    /// Gets the interactable descendant of this [`WidgetInst`] at the given position, or [`None`]
+    /// if no such widget exists.
+    /// 
+    /// This will typically be the widget that handles cursor events at the given position.
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId>;
+
     /// Processes an "initial" [`CursorEvent`] that may be within the bounds of this [`WidgetInst`]
     /// while there is no ongoing interaction involving the cursor.
     fn cursor_event(
@@ -130,6 +137,9 @@ pub trait WidgetEnvironment {
 
     /// Determines whether the given keyboard key is currently pressed.
     fn is_key_down(&self, key: KeyCode) -> bool;
+
+    /// Calls `f` for every feedback item for all active interactions.
+    fn interaction_feedback(&self, f: &mut dyn FnMut(&dyn Any));
 }
 
 impl<T: WidgetBase + ?Sized> WidgetBase for Rc<T> {}
@@ -152,6 +162,10 @@ impl<Env: WidgetEnvironment + ?Sized, T: WidgetInst<Env> + ?Sized> WidgetInst<En
         (**self).draw(env, drawer)
     }
 
+    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+        (**self).identify(env, pos)
+    }
+
     fn cursor_event(
         &self,
         env: &mut Env,
@@ -163,5 +177,25 @@ impl<Env: WidgetEnvironment + ?Sized, T: WidgetInst<Env> + ?Sized> WidgetInst<En
 
     fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>> {
         (**self).focus(env, backward)
+    }
+}
+
+/// A unique identifier for a [`Widget`].
+/// 
+/// Only certain widgets will have an [`WidgetId`], usually when it is necessary to identify it
+/// within a [`WidgetEnvironment`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WidgetId(unique::Unique);
+
+impl WidgetId {
+    /// Constructs a new [`WidgetId`], different from all other identifiers generated so far.
+    pub fn new() -> Self {
+        Self(unique::Unique::new())
+    }
+}
+
+impl Default for WidgetId {
+    fn default() -> Self {
+        Self::new()
     }
 }

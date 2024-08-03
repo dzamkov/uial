@@ -657,7 +657,7 @@ impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuDrawer<'_> {
         &mut self,
         image: ImageSource<WgpuImageAtlas<'_>>,
         paint: Paint,
-        trans: Similarity2i,
+        trans: Ortho2i,
     ) {
         let layer = self.next_layer();
         let paint: palette::Srgba<u8> = paint.into();

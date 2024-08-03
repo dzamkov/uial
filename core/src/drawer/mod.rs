@@ -4,7 +4,7 @@ mod text;
 use super::*;
 pub use polyline::*;
 pub use text::*;
-use uial_geometry::{Similarity2, Similarity2i};
+use uial_geometry::{Similarity2, Ortho2i};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -88,6 +88,11 @@ pub trait Image {
     /// every time this function is called.
     fn as_source(&self) -> ImageSource<Self::Store>;
 
+    /// The size of this image.
+    fn size(&self) -> Size2i {
+        self.as_source().size()
+    }
+
     /// Gets an [`ImageView`] for a rectangular section of this image, or [`None`] if the requested
     /// section is out of bounds.
     fn view(self, sub: Box2i) -> Option<ImageView<Self>>
@@ -97,6 +102,18 @@ pub trait Image {
         let source = self.as_source();
         let rect = source.store.image_part(source.rect, sub)?;
         Some(ImageView { image: self, rect })
+    }
+
+    /// Gets an [`ImageView`] for the entire image.
+    fn view_all(self) -> ImageView<Self>
+    where
+        Self: Sized,
+    {
+        let rect = self.as_source().rect;
+        ImageView {
+            image: self,
+            rect,
+        }
     }
 }
 
@@ -179,6 +196,18 @@ impl<'a, Store: ImageStore + ?Sized> ImageSource<'a, Store> {
     pub fn rect(&self) -> Store::Rect {
         self.rect
     }
+
+    /// The size of this image.
+    pub fn size(&self) -> Size2i {
+        self.store.image_size(self.rect)
+    }
+
+    /// Gets an [`ImageSource`] for a given rectangular section of this image, or [`None`] if the
+    /// requested section is out of bounds.
+    pub fn view(&self, sub: Box2i) -> Option<Self> {
+        let rect = self.store.image_part(self.rect, sub)?;
+        Some(Self::new(self.store, rect))
+    }
 }
 
 /// Provides functions for loading and preparing images.
@@ -207,7 +236,7 @@ pub trait ImageDrawer<Store: ImageStore + ?Sized>: RasterDrawer {
     /// Draws an image to the underlying surface. The color and opacity of the image will be
     /// multiplied by `paint`, and the image will be transformed by `trans` to position it
     /// on the surface.
-    fn draw_image(&mut self, image: ImageSource<Store>, paint: Paint, trans: Similarity2i);
+    fn draw_image(&mut self, image: ImageSource<Store>, paint: Paint, trans: Ortho2i);
 }
 
 impl<T: ImageManager> ImageManager for &T {
@@ -278,7 +307,7 @@ impl<T: RasterDrawer + ?Sized> RasterDrawer for &mut T {
 }
 
 impl<Store: ImageStore + ?Sized, T: ImageDrawer<Store>> ImageDrawer<Store> for &mut T {
-    fn draw_image(&mut self, image: ImageSource<Store>, paint: Paint, trans: Similarity2i) {
+    fn draw_image(&mut self, image: ImageSource<Store>, paint: Paint, trans: Ortho2i) {
         (**self).draw_image(image, paint, trans)
     }
 }
