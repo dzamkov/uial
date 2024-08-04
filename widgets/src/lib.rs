@@ -123,7 +123,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
                     )
                     .unwrap(),
                 }),
-                padding: Padding2i::uniform(5),
+                padding: Padding2i::uniform(8),
                 enabled_font: font
                     .clone()
                     .with_height(20.0)
