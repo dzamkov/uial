@@ -8,7 +8,7 @@ pub use stretchable::Stretchable;
 pub use text_button::*;
 use uial::drawer::{BorrowImageTTFontFamily, ImageTTFont, ImageTTFontFamily};
 use uial::drawer::{HasImageManager, Image, ImageManager, ImageView};
-use uial::{srgba, WidgetEnvironment};
+use uial::{srgba, Padding2i, WidgetEnvironment};
 
 /// Encapsulates the styling information for all available widgets.
 pub struct Style<I: Image, F: Clone> {
@@ -123,6 +123,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
                     )
                     .unwrap(),
                 }),
+                padding: Padding2i::uniform(5),
                 enabled_font: font
                     .clone()
                     .with_height(20.0)

@@ -22,7 +22,8 @@ pub use uial_geometry::{Duration, Instant};
 
 pub use widget::CursorEventResponse;
 pub use widget::DynWidget;
-pub use widget::{ExtendWidgetExt, PadWidgetExt, RestrictWidgetExt, SwitchWidgetExt};
+pub use widget::{ExtendWidgetExt, MinimizeWidgetExt, PadWidgetExt};
+pub use widget::{RestrictWidgetExt, SwitchWidgetExt};
 pub use widget::{OnClickWidgetExt, OnKeyWidgetExt};
 pub use widget::{Widget, WidgetBase, WidgetEnvironment, WidgetInst, WidgetSlot, WidgetId};
 

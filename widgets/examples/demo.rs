@@ -27,10 +27,8 @@ fn main() {
                     }
                 )
             ]
-            .with_width(400)
-            .with_height(30)
-            .center_h()
-            .center_v()
+            .minimize()
+            .center()
             .into_rc_dyn()
         },
     }

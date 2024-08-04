@@ -43,6 +43,7 @@ pub struct BandPattern {
     bands_y: Vec<Band>,
     total_weight_x: NonZeroU32,
     total_weight_y: NonZeroU32,
+    min_size: Size2i,
 }
 
 impl BandPattern {
@@ -67,12 +68,35 @@ impl BandPattern {
             .sum();
         let total_weight_x = NonZeroU32::new(total_weight_x)?;
         let total_weight_y = NonZeroU32::new(total_weight_y)?;
+        let min_size = size2i(
+            bands_x
+                .iter()
+                .map(|b| match b.mode {
+                    BandMode::Fixed => b.size.get(),
+                    BandMode::Tiling { .. } => 0,
+                })
+                .sum(),
+            bands_y
+                .iter()
+                .map(|b| match b.mode {
+                    BandMode::Fixed => b.size.get(),
+                    BandMode::Tiling { .. } => 0,
+                })
+                .sum(),
+        );
         Some(Self {
             bands_x,
             bands_y,
             total_weight_x,
             total_weight_y,
+            min_size,
         })
+    }
+
+    
+    /// Gets the minimum size this pattern can be stretched to.
+    pub fn min_size(&self) -> Size2i {
+        self.min_size
     }
 
     /// Gets the size of the source image this pattern can be used with.
@@ -96,7 +120,7 @@ impl<T: Image> Stretchable<T> {
 
     /// Gets the minimum size of this image.
     pub fn min_size(&self) -> Size2i {
-        self.source.size()
+        self.pattern.min_size()
     }
 
     /// Draws the expandable image to the given drawer with the given size.
@@ -108,8 +132,7 @@ impl<T: Image> Stretchable<T> {
         trans: Ortho2i,
     ) {
         let source = self.source.as_source();
-        let source_size = source.size();
-        let excess_size = size - source_size;
+        let excess_size = size - self.min_size();
         for band_y in draw_bands(
             &self.pattern.bands_y,
             self.pattern.total_weight_y,

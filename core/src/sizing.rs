@@ -199,6 +199,32 @@ impl Sizing {
         }
     }
 
+    /// Constructs a [`Sizing`] consisting of the [`Size2i`]s, `size2i(x, y)`, that minimize `x`.
+    /// 
+    /// i.e. `size2i(x, y)` is in the returned set if it is in this set and `size2i(x + i, y)` is
+    /// not for every `i > 0`.
+    pub fn minimize_x(&self) -> Self {
+        // TODO: Real implementation
+        if let Some((min, max)) = self.as_range() {
+            Self::range(min, size2i(min.x, max.y))
+        } else {
+            todo!()
+        }
+    }
+
+    /// Constructs a [`Sizing`] consisting of the [`Size2i`]s, `size2i(x, y)`, that minimize `y`.
+    /// 
+    /// i.e. `size2i(x, y)` is in the returned set if it is in this set and `size2i(x, y + i)` is
+    /// not for every `i > 0`.
+    pub fn minimize_y(&self) -> Self {
+        // TODO: Real implementation
+        if let Some((min, max)) = self.as_range() {
+            Self::range(min, size2i(max.x, min.y))
+        } else {
+            todo!()
+        }
+    }
+
     /// Constructs a [`Sizing`] consisting of the [`Size2i`]s, `size2i(x_a + x_b, y)`, such that
     /// `size2i(x_a, y)` is in `a` and `size2i(x_b, y)` is in `b`.
     pub fn stack_x(a: &Self, b: &Self) -> Self {

@@ -29,6 +29,9 @@ pub struct TextButtonStyle<I: Image, F: Clone> {
     /// The style of the underlying button.
     pub base: Rc<ButtonStyle<I>>,
 
+    /// The padding applied to the text inside the button.
+    pub padding: Padding2i,
+
     /// The font used to render the text of the button when it is enabled.
     pub enabled_font: F,
 
@@ -63,8 +66,8 @@ impl<I: Image, Font: Clone, E: PropertyBase<Value = bool>, T: PropertyBase<Value
                 },
                 self.text
             )
-            .center_h()
-            .center_v()
+            .center()
+            .with_padding(self.style.padding)
         ]
     }
 }
