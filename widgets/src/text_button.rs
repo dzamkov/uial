@@ -1,11 +1,11 @@
 use crate::ButtonStyle;
 use std::rc::Rc;
-use uial::drawer::{Font, Image, ImageDrawer};
+use uial::drawer::{Font, ImageHandle, ImageDrawer};
 use uial::*;
 
 /// A helper for constructing a text button widget.
 pub struct TextButtonBuilder<
-    I: Image,
+    I: ImageHandle,
     Font: Clone,
     E: PropertyBase<Value = bool>,
     T: PropertyBase<Value = String>,
@@ -25,7 +25,7 @@ pub struct TextButtonBuilder<
 }
 
 /// Encapsulates the styling information for a text button.
-pub struct TextButtonStyle<I: Image, F: Clone> {
+pub struct TextButtonStyle<I: ImageHandle, F: Clone> {
     /// The style of the underlying button.
     pub base: Rc<ButtonStyle<I>>,
 
@@ -39,13 +39,13 @@ pub struct TextButtonStyle<I: Image, F: Clone> {
     pub disabled_font: F,
 }
 
-impl<I: Image, Font: Clone, E: PropertyBase<Value = bool>, T: PropertyBase<Value = String>, F>
-    TextButtonBuilder<I, Font, E, T, F>
+impl<H: ImageHandle, Font: Clone, E: PropertyBase<Value = bool>, T: PropertyBase<Value = String>, F>
+    TextButtonBuilder<H, Font, E, T, F>
 {
     /// Constructs the text button widget described by this builder.
     pub fn build<Env: WidgetEnvironment + Track + ?Sized>(self) -> impl Widget<Env>
     where
-        Env::Drawer: ImageDrawer<I::Store>,
+        Env::Drawer: ImageDrawer<H::Source>,
         Font: uial::drawer::Font<Env::Drawer>,
         Font::Glyph: Sized,
         E: Property<Env, Value = bool> + Clone,
@@ -98,15 +98,15 @@ impl<Env: ?Sized, E: Property<Env, Value = bool>, T: Property<Env>> Property<Env
 /// Shortcut for creating a text button that is always enabled.
 pub fn text_button<
     Env: WidgetEnvironment + Track + ?Sized,
-    I: Image,
+    H: ImageHandle,
     F: Font<Env::Drawer> + Clone,
 >(
-    style: Rc<TextButtonStyle<I, F>>,
+    style: Rc<TextButtonStyle<H, F>>,
     text: String,
     on_click: impl Fn(&mut Env),
 ) -> impl Widget<Env>
 where
-    Env::Drawer: ImageDrawer<I::Store>,
+    Env::Drawer: ImageDrawer<H::Source>,
     F::Glyph: Sized,
 {
     TextButtonBuilder {

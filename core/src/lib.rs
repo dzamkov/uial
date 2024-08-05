@@ -53,11 +53,11 @@ pub fn stateful_dynamic<Env: HasClock + HasReact + ?Sized, T: Update + Clone>(
 
 /// Gets an opaque implementation of [`ImageManager`] from a suitable environment. By erasing the
 /// exact type, this can be used to work around "type annotations required" errors in a closure.
-pub fn generic_image_manager<Env: ?Sized + drawer::HasImageManager, Store: drawer::ImageStore>(
+pub fn generic_image_manager<Env: ?Sized + drawer::HasImageManager, Store: drawer::ImageSource>(
     env: &Env,
-) -> impl drawer::ImageManager<Store = Store> + Copy
+) -> impl drawer::ImageManager<Source = Store> + Copy
 where
-    Env::ImageManager: drawer::ImageManager<Store = Store>,
+    Env::ImageManager: drawer::ImageManager<Source = Store>,
 {
     env.image_manager()
 }

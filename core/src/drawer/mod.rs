@@ -3,10 +3,10 @@ mod text;
 
 use super::*;
 pub use polyline::*;
-pub use text::*;
-use uial_geometry::{Similarity2, Ortho2i};
 use std::rc::Rc;
 use std::sync::Arc;
+pub use text::*;
+use uial_geometry::{Ortho2i, Similarity2};
 
 /// The typical color type for use with drawing functions.
 pub type Color = palette::LinSrgb<f32>;
@@ -74,96 +74,122 @@ pub trait RasterDrawer {
     fn fill_rect(&mut self, paint: Paint, rect: Box2i);
 }
 
-/// A two-dimensional array of [`Paint`]s that can be efficiently drawn to compaitble
+/// A two-dimensional array of [`Paint`]s that can be efficiently drawn to compatible
 /// [`ImageDrawer`]s.
-pub trait Image {
-    /// The type of backing storage used for this type of image.
-    ///
-    /// This determines which [`ImageDrawer`]s can draw this image.
-    type Store: ImageStore;
+pub struct Image<H: ImageHandle> {
+    source: H,
+    rect: <H::Source as ImageSource>::Rect,
+}
 
-    /// Gets a reference to the data for this image as an [`ImageSource`].
+/// Maintains a section of an [`ImageSource`] holding data for an [`Image`].
+///
+/// For atlas-based [`ImageSource`]s, holding an [`ImageHandle`] will prevent relevant data from
+/// being overwritten.
+pub trait ImageHandle {
+    /// The type of backing storage used for this type of handle.
     ///
-    /// It is guaranteed that the [`ImageSource::rect`] of the returned source will be the same
-    /// every time this function is called.
-    fn as_source(&self) -> ImageSource<Self::Store>;
+    /// This determines which [`ImageDrawer`]s can draw the image.
+    type Source: ImageSource + ?Sized;
+
+    /// Gets the underlying [`ImageSource`] for this handle.
+    fn source(&self) -> &Self::Source;
+}
+
+impl<H: ImageHandle + ?Sized> ImageHandle for &H {
+    type Source = H::Source;
+    fn source(&self) -> &Self::Source {
+        (**self).source()
+    }
+}
+
+impl<H: ImageHandle + ?Sized> ImageHandle for Box<H> {
+    type Source = H::Source;
+    fn source(&self) -> &Self::Source {
+        (**self).source()
+    }
+}
+
+impl<H: ImageHandle + ?Sized> ImageHandle for Rc<H> {
+    type Source = H::Source;
+    fn source(&self) -> &Self::Source {
+        (**self).source()
+    }
+}
+
+impl<H: ImageHandle + ?Sized> ImageHandle for Arc<H> {
+    type Source = H::Source;
+    fn source(&self) -> &Self::Source {
+        (**self).source()
+    }
+}
+
+impl<H: ImageHandle> Image<H> {
+    /// Constructs an [`Image`] from a handle and a location within the handle's [`ImageSource`].
+    pub fn new(handle: H, rect: <H::Source as ImageSource>::Rect) -> Self {
+        Image {
+            source: handle,
+            rect,
+        }
+    }
+
+    /// The [`ImageSource`] where this image is stored.
+    pub fn source(&self) -> &H::Source {
+        self.source.source()
+    }
+
+    /// The location of this image within its [`ImageSource`].
+    pub fn rect(&self) -> <H::Source as ImageSource>::Rect {
+        self.rect
+    }
 
     /// The size of this image.
-    fn size(&self) -> Size2i {
-        self.as_source().size()
+    pub fn size(&self) -> Size2i {
+        self.source.source().image_size(self.rect)
     }
 
-    /// Gets an [`ImageView`] for a rectangular section of this image, or [`None`] if the requested
+    /// Gets an [`Image`] for a rectangular section of this image, or [`None`] if the requested
     /// section is out of bounds.
-    fn view(self, sub: Box2i) -> Option<ImageView<Self>>
+    pub fn view(self, sub: Box2i) -> Option<Image<H>>
     where
         Self: Sized,
     {
-        let source = self.as_source();
-        let rect = source.store.image_part(source.rect, sub)?;
-        Some(ImageView { image: self, rect })
+        let rect = self.source.source().image_part(self.rect, sub)?;
+        Some(Image {
+            source: self.source,
+            rect,
+        })
     }
 
-    /// Gets an [`ImageView`] for the entire image.
-    fn view_all(self) -> ImageView<Self>
-    where
-        Self: Sized,
-    {
-        let rect = self.as_source().rect;
-        ImageView {
-            image: self,
-            rect,
+    /// Converts this image to a view of the backing store.
+    pub fn to_source(&self) -> Image<&H::Source> {
+        Image {
+            source: self.source.source(),
+            rect: self.rect,
+        }
+    }
+
+    /// Wraps the underlying handle in an [`Rc`], allowing the image to be cloned.
+    pub fn into_rc(self) -> Image<Rc<H>> {
+        Image {
+            source: Rc::new(self.source),
+            rect: self.rect,
         }
     }
 }
 
-impl<T: Image + ?Sized> Image for &T {
-    type Store = T::Store;
-    fn as_source(&self) -> ImageSource<Self::Store> {
-        (**self).as_source()
+impl<H: ImageHandle + Clone> Clone for Image<H> {
+    fn clone(&self) -> Self {
+        Image {
+            source: self.source.clone(),
+            rect: self.rect,
+        }
     }
 }
 
-impl<T: Image + ?Sized> Image for Box<T> {
-    type Store = T::Store;
-    fn as_source(&self) -> ImageSource<Self::Store> {
-        (**self).as_source()
-    }
-}
-
-impl<T: Image + ?Sized> Image for Rc<T> {
-    type Store = T::Store;
-    fn as_source(&self) -> ImageSource<Self::Store> {
-        (**self).as_source()
-    }
-}
-
-impl<T: Image + ?Sized> Image for Arc<T> {
-    type Store = T::Store;
-    fn as_source(&self) -> ImageSource<Self::Store> {
-        (**self).as_source()
-    }
-}
-
-/// A rectangular section of an [`Image`].
-///
-/// This is itself an [`Image`] which is compatible with the same [`ImageDrawer`]s as the original
-/// image.
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub struct ImageView<T: Image> {
-    image: T,
-    rect: <T::Store as ImageStore>::Rect,
-}
-
-impl<T: Image> Image for ImageView<T> {
-    type Store = T::Store;
-    fn as_source(&self) -> ImageSource<Self::Store> {
-        ImageSource::new(self.image.as_source().store, self.rect)
-    }
-}
+impl<H: ImageHandle + Copy> Copy for Image<H> {}
 
 /// The backing storage for one or more images, for use with an [`ImageDrawer`].
-pub trait ImageStore {
+pub trait ImageSource: ImageHandle<Source = Self> {
     /// Describes the location of an image within this store.
     type Rect: Eq + Copy;
 
@@ -175,51 +201,16 @@ pub trait ImageStore {
     fn image_part(&self, rect: Self::Rect, sub: Box2i) -> Option<Self::Rect>;
 }
 
-/// A reference to an image within an [`ImageStore`].
-pub struct ImageSource<'a, Store: 'a + ImageStore + ?Sized> {
-    store: &'a Store,
-    rect: Store::Rect,
-}
-
-impl<'a, Store: ImageStore + ?Sized> ImageSource<'a, Store> {
-    /// Constructs an [`ImageSource`] from the given data.
-    pub fn new(store: &'a Store, rect: Store::Rect) -> Self {
-        Self { store, rect }
-    }
-
-    /// The [`ImageStore`] where this image is stored.
-    pub fn store(&self) -> &'a Store {
-        self.store
-    }
-
-    /// The location of this image within its [`ImageStore`].
-    pub fn rect(&self) -> Store::Rect {
-        self.rect
-    }
-
-    /// The size of this image.
-    pub fn size(&self) -> Size2i {
-        self.store.image_size(self.rect)
-    }
-
-    /// Gets an [`ImageSource`] for a given rectangular section of this image, or [`None`] if the
-    /// requested section is out of bounds.
-    pub fn view(&self, sub: Box2i) -> Option<Self> {
-        let rect = self.store.image_part(self.rect, sub)?;
-        Some(Self::new(self.store, rect))
-    }
-}
-
 /// Provides functions for loading and preparing images.
 pub trait ImageManager {
-    /// The type of [`ImageStore`] used by this [`ImageManager`].
-    type Store: ImageStore;
+    /// The type of [`ImageSource`] used by this [`ImageManager`].
+    type Source: ImageSource;
 
-    /// A two-dimensional grid of [`Paint`]s
-    type Image: Image<Store = Self::Store>;
+    /// The type of [`ImageHandle`] used to maintain a loaded image.
+    type Handle: ImageHandle<Source = Self::Source>;
 
     /// Loads an `Image` from the given source data.
-    fn load_image(&self, source: image::DynamicImage) -> Self::Image;
+    fn load_image(&self, source: image::DynamicImage) -> Image<Self::Handle>;
 }
 
 /// An environment that has a preferred [`ImageManager`].
@@ -231,18 +222,18 @@ pub trait HasImageManager {
     fn image_manager(&self) -> Self::ImageManager;
 }
 
-/// A [`RasterDrawer`] which can draw images from a particular kind of [`ImageStore`].
-pub trait ImageDrawer<Store: ImageStore + ?Sized>: RasterDrawer {
+/// A [`RasterDrawer`] which can draw images from a particular kind of [`ImageSource`].
+pub trait ImageDrawer<Store: ImageSource + ?Sized>: RasterDrawer {
     /// Draws an image to the underlying surface. The color and opacity of the image will be
     /// multiplied by `paint`, and the image will be transformed by `trans` to position it
     /// on the surface.
-    fn draw_image(&mut self, image: ImageSource<Store>, paint: Paint, trans: Ortho2i);
+    fn draw_image(&mut self, image: Image<&Store>, paint: Paint, trans: Ortho2i);
 }
 
 impl<T: ImageManager> ImageManager for &T {
-    type Store = T::Store;
-    type Image = T::Image;
-    fn load_image(&self, source: image::DynamicImage) -> Self::Image {
+    type Source = T::Source;
+    type Handle = T::Handle;
+    fn load_image(&self, source: image::DynamicImage) -> Image<T::Handle> {
         (**self).load_image(source)
     }
 }
@@ -306,8 +297,8 @@ impl<T: RasterDrawer + ?Sized> RasterDrawer for &mut T {
     }
 }
 
-impl<Store: ImageStore + ?Sized, T: ImageDrawer<Store>> ImageDrawer<Store> for &mut T {
-    fn draw_image(&mut self, image: ImageSource<Store>, paint: Paint, trans: Ortho2i) {
+impl<Store: ImageSource + ?Sized, T: ImageDrawer<Store>> ImageDrawer<Store> for &mut T {
+    fn draw_image(&mut self, image: Image<&Store>, paint: Paint, trans: Ortho2i) {
         (**self).draw_image(image, paint, trans)
     }
 }

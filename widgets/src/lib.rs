@@ -4,21 +4,21 @@ pub mod text_button;
 
 pub use button::*;
 use std::rc::Rc;
-pub use stretchable::Stretchable;
+pub use stretchable::StretchableImage;
 pub use text_button::*;
 use uial::drawer::{BorrowImageTTFontFamily, ImageTTFont, ImageTTFontFamily};
-use uial::drawer::{HasImageManager, Image, ImageManager, ImageView};
+use uial::drawer::{HasImageManager, ImageHandle, ImageManager};
 use uial::{srgba, Padding2i, WidgetEnvironment};
 
 /// Encapsulates the styling information for all available widgets.
-pub struct Style<I: Image, F: Clone> {
+pub struct Style<I: ImageHandle, F: Clone> {
     /// The style for buttons.
     pub button: Rc<TextButtonStyle<I, F>>,
 }
 
 /// A [`Style`] whose resources are managed by an [`ImageManager`] of type `M`.
 pub type RunStyle<M> =
-    Style<ImageView<Rc<<M as ImageManager>::Image>>, ImageTTFont<M, Rc<ImageTTFontFamily<M>>>>;
+    Style<Rc<<M as ImageManager>::Handle>, ImageTTFont<M, Rc<ImageTTFontFamily<M>>>>;
 
 /// Loads the default [`Style`] into the given [`WidgetEnvironment`].
 pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
@@ -39,14 +39,15 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
     );
     Style {
         button: {
-            let image = image_manager.load_image(
-                image::load_from_memory_with_format(
-                    include_bytes!("button_default.png"),
-                    image::ImageFormat::Png,
+            let image = image_manager
+                .load_image(
+                    image::load_from_memory_with_format(
+                        include_bytes!("button_default.png"),
+                        image::ImageFormat::Png,
+                    )
+                    .unwrap(),
                 )
-                .unwrap(),
-            );
-            let image = Rc::new(image);
+                .into_rc();
             let pattern = BandPattern::new(
                 vec![
                     Band {
@@ -90,7 +91,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
             .unwrap();
             Rc::new(TextButtonStyle {
                 base: Rc::new(ButtonStyle {
-                    normal: Stretchable::new(
+                    normal: StretchableImage::new(
                         image
                             .clone()
                             .view(Box2i::from_min_size(vec2i(0, 0), size2i(8, 8)))
@@ -98,7 +99,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
                         pattern.clone(),
                     )
                     .unwrap(),
-                    hover: Stretchable::new(
+                    hover: StretchableImage::new(
                         image
                             .clone()
                             .view(Box2i::from_min_size(vec2i(8, 0), size2i(8, 8)))
@@ -106,7 +107,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
                         pattern.clone(),
                     )
                     .unwrap(),
-                    pressed: Stretchable::new(
+                    pressed: StretchableImage::new(
                         image
                             .clone()
                             .view(Box2i::from_min_size(vec2i(16, 0), size2i(8, 8)))
@@ -114,7 +115,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
                         pattern.clone(),
                     )
                     .unwrap(),
-                    disabled: Stretchable::new(
+                    disabled: StretchableImage::new(
                         image
                             .clone()
                             .view(Box2i::from_min_size(vec2i(24, 0), size2i(8, 8)))

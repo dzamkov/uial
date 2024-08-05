@@ -61,7 +61,7 @@ impl RasterDrawer for WgpuErasedDrawer {
 impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuErasedDrawer {
     fn draw_image(
         &mut self,
-        image: ImageSource<WgpuImageAtlas<'_>>,
+        image: Image<&WgpuImageAtlas>,
         paint: Paint,
         trans: Ortho2i,
     ) {

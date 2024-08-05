@@ -48,7 +48,14 @@ impl<'a> WgpuImageAtlas<'a> {
     }
 }
 
-impl ImageStore for WgpuImageAtlas<'_> {
+impl<'a> ImageHandle for WgpuImageAtlas<'a> {
+    type Source = WgpuImageAtlas<'a>;
+    fn source(&self) -> &WgpuImageAtlas<'a> {
+        self
+    }
+}
+
+impl ImageSource for WgpuImageAtlas<'_> {
     type Rect = Box2i;
 
     fn image_size(&self, rect: Box2i) -> Size2i {
@@ -68,9 +75,9 @@ impl ImageStore for WgpuImageAtlas<'_> {
 }
 
 impl<'a> ImageManager for &'a WgpuImageAtlas<'a> {
-    type Store = WgpuImageAtlas<'a>;
-    type Image = WgpuImage<'a>;
-    fn load_image(&self, source: image::DynamicImage) -> Self::Image {
+    type Source = WgpuImageAtlas<'a>;
+    type Handle = WgpuImageHandle<'a>;
+    fn load_image(&self, source: image::DynamicImage) -> Image<WgpuImageHandle<'a>> {
         let size = guillotiere::size2(source.width() as i32, source.height() as i32);
         let mut allocator = self.allocator.lock().unwrap();
         if let Some(alloc) = allocator.allocate(size) {
@@ -97,31 +104,31 @@ impl<'a> ImageManager for &'a WgpuImageAtlas<'a> {
                     depth_or_array_layers: 1,
                 },
             );
-            WgpuImage { atlas: self, alloc }
+            let rect = alloc.rectangle;
+            Image::new(
+                WgpuImageHandle { atlas: self, alloc },
+                Box2i::from_min_max(vec2i(rect.min.x, rect.min.y), vec2i(rect.max.x, rect.max.y)),
+            )
         } else {
             todo!()
         }
     }
 }
 
-/// An image in a [`WgpuImageAtlas`].
-pub struct WgpuImage<'a> {
+/// A handle to an allocated image in a [`WgpuImageAtlas`].
+pub struct WgpuImageHandle<'a> {
     atlas: &'a WgpuImageAtlas<'a>,
     alloc: guillotiere::Allocation,
 }
 
-impl<'a> Image for WgpuImage<'a> {
-    type Store = WgpuImageAtlas<'a>;
-    fn as_source(&self) -> ImageSource<Self::Store> {
-        let rect = self.alloc.rectangle;
-        ImageSource::new(
-            self.atlas,
-            Box2i::from_min_max(vec2i(rect.min.x, rect.min.y), vec2i(rect.max.x, rect.max.y)),
-        )
+impl<'a> ImageHandle for WgpuImageHandle<'a> {
+    type Source = WgpuImageAtlas<'a>;
+    fn source(&self) -> &WgpuImageAtlas<'a> {
+        self.atlas
     }
 }
 
-impl Drop for WgpuImage<'_> {
+impl Drop for WgpuImageHandle<'_> {
     fn drop(&mut self) {
         let mut allocator = self.atlas.allocator.lock().unwrap();
         allocator.deallocate(self.alloc.id);

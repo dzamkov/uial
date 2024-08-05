@@ -39,7 +39,7 @@ fn main() {
                     100.0,
                 );
                 d.draw_image(
-                    ferris.as_source(),
+                    ferris.to_source(),
                     Paint::new(1.0, 1.0, 1.0, 1.0),
                     Ortho2i::translate(vec2i(100, 100)),
                 );

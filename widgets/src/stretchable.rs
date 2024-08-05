@@ -1,12 +1,11 @@
-use drawer::ImageDrawer;
 use std::num::NonZeroU32;
-use uial::drawer::Image;
+use uial::drawer::{Image, ImageDrawer, ImageHandle};
 use uial::*;
 
 /// Annotates an [`Image`] with additional information that allows it to be stretched to
 /// arbitrary sizes (larger than the source image).
-pub struct Stretchable<T: Image> {
-    source: T,
+pub struct StretchableImage<H: ImageHandle> {
+    source: Image<H>,
     pattern: BandPattern,
 }
 
@@ -107,11 +106,11 @@ impl BandPattern {
     }
 }
 
-impl<T: Image> Stretchable<T> {
+impl<H: ImageHandle> StretchableImage<H> {
     /// Constructs a new [`Stretchable`] from the given source image and [`BandPattern`].
     ///
     /// Returns [`None`] if the size of the source image does not match the size of the pattern.
-    pub fn new(source: T, pattern: BandPattern) -> Option<Self> {
+    pub fn new(source: Image<H>, pattern: BandPattern) -> Option<Self> {
         if source.size() != pattern.size() {
             return None;
         }
@@ -124,14 +123,14 @@ impl<T: Image> Stretchable<T> {
     }
 
     /// Draws the expandable image to the given drawer with the given size.
-    pub fn draw_to<Drawer: ImageDrawer<T::Store> + ?Sized>(
+    pub fn draw_to<Drawer: ImageDrawer<H::Source> + ?Sized>(
         &self,
         size: Size2i,
         drawer: &mut Drawer,
         paint: Paint,
         trans: Ortho2i,
     ) {
-        let source = self.source.as_source();
+        let source = self.source.to_source();
         let excess_size = size - self.min_size();
         for band_y in draw_bands(
             &self.pattern.bands_y,

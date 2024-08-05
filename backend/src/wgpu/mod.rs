@@ -34,7 +34,7 @@ pub trait HasWgpuDrawerContext<'wgpu> {
 pub struct WgpuDrawerContext<'a> {
     context: &'a WgpuContext,
     draw_format: wgpu::TextureFormat,
-    white_image: WgpuImage<'a>,
+    white_image: Image<WgpuImageHandle<'a>>,
     bind_group_layout_0: wgpu::BindGroupLayout,
     line_pipeline: wgpu::RenderPipeline,
     tri_pipeline: wgpu::RenderPipeline,
@@ -223,9 +223,9 @@ impl<'a> WgpuDrawerContext<'a> {
         inner: impl FnOnce(&mut WgpuDrawer<'pass>),
     ) {
         // Get central UV for solid white image
-        let white_image = self.white_image.as_source();
+        let white_image = self.white_image.to_source();
         let white_uv = (white_image.rect().min.into_float() + vec2(0.5, 0.5))
-            / white_image.store().texture_size as Scalar;
+            / white_image.source().texture_size as Scalar;
 
         // Begin render pass
         let vertex_buffer;
@@ -655,7 +655,7 @@ impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuDrawer<'_> {
     #[allow(clippy::identity_op)]
     fn draw_image(
         &mut self,
-        image: ImageSource<WgpuImageAtlas<'_>>,
+        image: Image<&WgpuImageAtlas<'_>>,
         paint: Paint,
         trans: Ortho2i,
     ) {
@@ -665,7 +665,7 @@ impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuDrawer<'_> {
         let base_index = verts.len() as u32;
         let pos_min = trans * vec2i(0, 0);
         let pos_max = trans * image.rect().size().into_vec();
-        let uv_scale = 1.0 / image.store().texture_size as Scalar;
+        let uv_scale = 1.0 / image.source().texture_size as Scalar;
         let uv_min = image.rect().min.into_float() * uv_scale;
         let uv_max = uv_min + image.rect().size().into_vec().into_float() * uv_scale;
         verts.push(DrawVertex {

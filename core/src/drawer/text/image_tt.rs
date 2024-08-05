@@ -21,7 +21,8 @@ pub struct ImageTTFontFamily<M: ImageManager> {
     face: MaybeUninit<FaceInfo<'static>>,
     image_manager: M,
     // TODO: Evict old entries from cache
-    glyph_images: RwLock<HashMap<ImageTTGlyph, (M::Image, Vector2i)>>,
+    #[allow(clippy::type_complexity)]
+    glyph_images: RwLock<HashMap<ImageTTGlyph, (Image<M::Handle>, Vector2i)>>,
 }
 
 /// Contains relevant information about the [`ttf_parser::Face`] for a [`ImageTTFont`].
@@ -318,7 +319,7 @@ impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> FontBase for ImageTT
 impl<
         M: ImageManager,
         Family: Borrow<ImageTTFontFamily<M>>,
-        Drawer: ImageDrawer<M::Store> + ?Sized,
+        Drawer: ImageDrawer<M::Source> + ?Sized,
     > Font<Drawer> for ImageTTFont<M, Family>
 {
     fn draw_glyph_to(&self, drawer: &mut Drawer, glyph: &ImageTTGlyph, offset: Vector2i) {
@@ -329,7 +330,7 @@ impl<
             let glyph_cache = family.glyph_images.read().unwrap();
             if let Some((image, image_offset)) = glyph_cache.get(glyph) {
                 drawer.draw_image(
-                    image.as_source(),
+                    image.to_source(),
                     self.paint,
                     Ortho2i::translate(offset + *image_offset),
                 );
@@ -346,7 +347,7 @@ impl<
             Entry::Occupied(entry) => {
                 let (image, image_offset) = entry.get();
                 drawer.draw_image(
-                    image.as_source(),
+                    image.to_source(),
                     self.paint,
                     Ortho2i::translate(offset + *image_offset),
                 );
@@ -355,7 +356,7 @@ impl<
                 let image = family.image_manager.load_image(image.into());
                 let (image, _) = entry.insert((image, image_offset));
                 drawer.draw_image(
-                    image.as_source(),
+                    image.to_source(),
                     self.paint,
                     Ortho2i::translate(offset + image_offset),
                 );

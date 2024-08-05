@@ -1,30 +1,30 @@
-use crate::Stretchable;
+use crate::StretchableImage;
 use drawer::ImageDrawer;
 use std::rc::Rc;
-use uial::drawer::Image;
+use uial::drawer::ImageHandle;
 use uial::*;
 
 /// A [`Widget`] which displays a clickable button (just the base, without any internal content).
-pub struct Button<I: Image, E: PropertyBase<Value = bool>, F> {
+pub struct Button<H: ImageHandle, E: PropertyBase<Value = bool>, F> {
     id: WidgetId,
-    style: Rc<ButtonStyle<I>>,
+    style: Rc<ButtonStyle<H>>,
     is_enabled: E,
     on_click: F,
 }
 
 /// Encapsulates the styling information for a [`Button`].
-pub struct ButtonStyle<I: Image> {
+pub struct ButtonStyle<H: ImageHandle> {
     /// The appearance of the button in its normal state.
-    pub normal: Stretchable<I>,
+    pub normal: StretchableImage<H>,
 
     /// The appearance of the button when it is hovered over.
-    pub hover: Stretchable<I>,
+    pub hover: StretchableImage<H>,
 
     /// The appearance of the button when it is pressed.
-    pub pressed: Stretchable<I>,
+    pub pressed: StretchableImage<H>,
 
     /// The appearance of the button when it is disabled.
-    pub disabled: Stretchable<I>,
+    pub disabled: StretchableImage<H>,
 }
 
 /// Identifies the visual state of a [`Button`].
@@ -36,7 +36,7 @@ pub enum ButtonState {
     Disabled,
 }
 
-impl<I: Image, E: PropertyBase<Value = bool> + Clone, F> Button<I, E, F> {
+impl<I: ImageHandle, E: PropertyBase<Value = bool> + Clone, F> Button<I, E, F> {
     /// Creates a new [`Button`] with the given properties.
     pub fn new(style: Rc<ButtonStyle<I>>, is_enabled: E, on_click: F) -> Self {
         Self {
@@ -96,23 +96,23 @@ impl<Env: WidgetEnvironment + ?Sized, E: Property<Env, Value = bool>> Property<E
 }
 
 /// Shortcut for creating a [`Button`] that is always enabled.
-pub fn button<Env: WidgetEnvironment + ?Sized, I: Image>(
+pub fn button<Env: WidgetEnvironment + ?Sized, I: ImageHandle>(
     style: Rc<ButtonStyle<I>>,
     on_click: impl Fn(&mut Env),
 ) -> Button<I, Const<bool>, impl Fn(&mut Env)> {
     Button::new(style, const_(true), on_click)
 }
 
-impl<I: Image, E: PropertyBase<Value = bool>, F> WidgetBase for Button<I, E, F> {}
+impl<I: ImageHandle, E: PropertyBase<Value = bool>, F> WidgetBase for Button<I, E, F> {}
 
 impl<
         Env: WidgetEnvironment + ?Sized,
-        I: Image,
+        H: ImageHandle,
         E: Property<Env, Value = bool> + Clone,
         F: Fn(&mut Env),
-    > Widget<Env> for Button<I, E, F>
+    > Widget<Env> for Button<H, E, F>
 where
-    Env::Drawer: ImageDrawer<I::Store>,
+    Env::Drawer: ImageDrawer<H::Source>,
 {
     fn sizing(&self, _: &Env) -> Sizing {
         let mut min = size2i(0, 0);
@@ -138,7 +138,7 @@ where
 }
 
 /// An instance of a [`Button`] widget.
-struct ButtonInst<'a, I: Image, E: PropertyBase<Value = bool>, F, Slot> {
+struct ButtonInst<'a, I: ImageHandle, E: PropertyBase<Value = bool>, F, Slot> {
     widget: &'a Button<I, E, F>,
     slot: Slot,
 }
@@ -146,13 +146,13 @@ struct ButtonInst<'a, I: Image, E: PropertyBase<Value = bool>, F, Slot> {
 impl<
         'a,
         Env: WidgetEnvironment + ?Sized,
-        I: Image,
+        H: ImageHandle,
         E: Property<Env, Value = bool> + Clone,
         F: Fn(&mut Env),
         Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for ButtonInst<'a, I, E, F, Slot>
+    > WidgetInst<Env> for ButtonInst<'a, H, E, F, Slot>
 where
-    Env::Drawer: ImageDrawer<I::Store>,
+    Env::Drawer: ImageDrawer<H::Source>,
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         let bounds = self.slot.bounds(env);
@@ -211,7 +211,7 @@ where
 impl<
         'a,
         Env: WidgetEnvironment + ?Sized,
-        I: Image,
+        I: ImageHandle,
         E: Property<Env, Value = bool>,
         F: Fn(&mut Env),
         Slot: WidgetSlot<Env>,
