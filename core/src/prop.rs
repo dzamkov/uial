@@ -246,3 +246,133 @@ macro_rules! field {
         )
     };
 }
+
+/// A [`Property`] of an unspecified type, determined at runtime.
+pub struct DynProperty<'a, Env: ?Sized, T: ?Sized>(dyn PropertySafe<Env, T> + 'a);
+
+impl<'a, Env: ?Sized, T: ?Sized> DynProperty<'a, Env, T> {
+    /// Converts a reference to a [`Property`] into a reference to a [`DynProperty`].
+    pub fn from_ref<P: Property<Env, Value = T> + 'a>(source: &P) -> &Self {
+        let source: &(dyn PropertySafe<Env, T> + 'a) = source;
+        unsafe { std::mem::transmute(source) }
+    }
+
+    /// Converts a boxed [`Property`] into a boxed [`DynProperty`].
+    pub fn from_box<P: Property<Env, Value = T> + 'a>(source: Box<P>) -> Box<Self> {
+        let source: Box<dyn PropertySafe<Env, T> + 'a> = source;
+        unsafe { std::mem::transmute(source) }
+    }
+
+    /// Converts an [`Rc`]-wrapped [`Property`] into a boxed [`DynProperty`].
+    pub fn from_rc<P: Property<Env, Value = T> + 'a>(source: Rc<P>) -> Rc<Self> {
+        let source: Rc<dyn PropertySafe<Env, T> + 'a> = source;
+        unsafe { std::mem::transmute(source) }
+    }
+
+    /// Converts an [`Arc`]-wrapped [`Property`] into a boxed [`DynProperty`].
+    pub fn from_arc<P: Property<Env, Value = T> + 'a>(source: Arc<P>) -> Arc<Self> {
+        let source: Arc<dyn PropertySafe<Env, T> + 'a> = source;
+        unsafe { std::mem::transmute(source) }
+    }
+}
+
+/// An object-safe variant of [`Property`].
+trait PropertySafe<Env: ?Sized, T: ?Sized> {
+    /// Accesses the value of this property using the given closure.
+    fn with_ref(&self, env: &Env, inner: &mut dyn FnMut(&T));
+
+    /// Gets the value of this [`Property`] from the given environment.
+    fn get(&self, env: &Env) -> T::Owned
+    where
+        T: ToOwned;
+}
+
+impl<Env: ?Sized, T: ?Sized, P: Property<Env, Value = T>> PropertySafe<Env, T> for P {
+    fn with_ref(&self, env: &Env, inner: &mut dyn FnMut(&T)) {
+        self.with_ref(env, inner)
+    }
+
+    fn get(&self, env: &Env) -> T::Owned
+    where
+        T: ToOwned,
+    {
+        self.get(env)
+    }
+}
+
+impl<'a, Env: ?Sized, T: ?Sized> PropertyBase for DynProperty<'a, Env, T> {
+    type Value = T;
+}
+
+impl<'a, Env: ?Sized, T: ?Sized> Property<Env> for DynProperty<'a, Env, T> {
+    fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Self::Value) -> R) -> R {
+        let mut inner = Some(inner);
+        let mut res = None;
+        {
+            let inner = &mut inner;
+            let res = &mut res;
+            self.0.with_ref(env, &mut |value| {
+                *res = Some(inner.take().expect("closure called twice")(value));
+            });
+        }
+        res.expect("closure not called")
+    }
+
+    fn get(&self, env: &Env) -> T::Owned
+    where
+        T: ToOwned,
+    {
+        self.0.get(env)
+    }
+}
+
+/// A [`Property`] which is internally defined by either a constant value, or an [`Rc`]-wrapped
+/// [`DynProperty`].
+pub enum ConstOrRcDynProperty<'a, Env: ?Sized, T> {
+    Const(T),
+    Dyn(Rc<DynProperty<'a, Env, T>>),
+}
+
+impl<Env: ?Sized, T> From<Const<T>> for ConstOrRcDynProperty<'_, Env, T> {
+    fn from(value: Const<T>) -> Self {
+        Self::Const(value.0)
+    }
+}
+
+impl<'a, Env: ?Sized, T> From<Rc<DynProperty<'a, Env, T>>> for ConstOrRcDynProperty<'a, Env, T> {
+    fn from(value: Rc<DynProperty<'a, Env, T>>) -> Self {
+        Self::Dyn(value)
+    }
+}
+
+impl<'a, Env: ?Sized, T: Clone> Clone for ConstOrRcDynProperty<'a, Env, T> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Const(value) => Self::Const(value.clone()),
+            Self::Dyn(value) => Self::Dyn(value.clone()),
+        }
+    }
+}
+
+impl<'a, Env: ?Sized, T> PropertyBase for ConstOrRcDynProperty<'a, Env, T> {
+    type Value = T;
+}
+
+impl<'a, Env: ?Sized, T> Property<Env> for ConstOrRcDynProperty<'a, Env, T> {
+    fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Self::Value) -> R) -> R {
+        match self {
+            Self::Const(value) => inner(value),
+            Self::Dyn(value) => value.with_ref(env, inner),
+        }
+    }
+
+    fn get(&self, env: &Env) -> T::Owned
+    where
+        T: ToOwned,
+    {
+        match self {
+            Self::Const(value) => value.to_owned(),
+            Self::Dyn(value) => value.get(env),
+        }
+    }
+}

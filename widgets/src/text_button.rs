@@ -1,27 +1,21 @@
-use crate::ButtonStyle;
+use crate::{ButtonStyle, RunFont, RunImageHandle};
 use std::rc::Rc;
-use uial::drawer::{Font, ImageHandle, ImageDrawer};
+use uial::drawer::{HasImageManager, ImageDrawer, ImageHandle, ImageManager};
 use uial::*;
 
 /// A helper for constructing a text button widget.
-pub struct TextButtonBuilder<
-    I: ImageHandle,
-    Font: Clone,
-    E: PropertyBase<Value = bool>,
-    T: PropertyBase<Value = String>,
-    F,
-> {
+pub struct TextButtonBuilder<'a, Env: WidgetEnvironment + HasImageManager + Track + ?Sized> {
     /// The style of the button.
-    pub style: Rc<TextButtonStyle<I, Font>>,
+    pub style: Rc<TextButtonStyle<RunImageHandle<Env>, RunFont<Env>>>,
 
     /// Determines whether the button is enabled.
-    pub is_enabled: E,
+    pub is_enabled: ConstOrRcDynProperty<'a, Env, bool>,
 
     /// Provides the text to be displayed on the button.
-    pub text: T,
+    pub text: ConstOrRcDynProperty<'a, Env, String>,
 
     /// The handler to be called when the button is clicked.
-    pub on_click: F,
+    pub on_click: Box<dyn Fn(&mut Env) + 'a>,
 }
 
 /// Encapsulates the styling information for a text button.
@@ -39,18 +33,12 @@ pub struct TextButtonStyle<I: ImageHandle, F: Clone> {
     pub disabled_font: F,
 }
 
-impl<H: ImageHandle, Font: Clone, E: PropertyBase<Value = bool>, T: PropertyBase<Value = String>, F>
-    TextButtonBuilder<H, Font, E, T, F>
-{
+impl<'a, Env: WidgetEnvironment + HasImageManager + Track + ?Sized> TextButtonBuilder<'a, Env> {
     /// Constructs the text button widget described by this builder.
-    pub fn build<Env: WidgetEnvironment + Track + ?Sized>(self) -> impl Widget<Env>
+    pub fn build(self) -> impl Widget<Env> + 'a
     where
-        Env::Drawer: ImageDrawer<H::Source>,
-        Font: uial::drawer::Font<Env::Drawer>,
-        Font::Glyph: Sized,
-        E: Property<Env, Value = bool> + Clone,
-        T: Property<Env, Value = String>,
-        F: Fn(&mut Env),
+        Env: 'a,
+        Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,
     {
         overlay![
             crate::Button::new(
@@ -96,24 +84,20 @@ impl<Env: ?Sized, E: Property<Env, Value = bool>, T: Property<Env>> Property<Env
 }
 
 /// Shortcut for creating a text button that is always enabled.
-pub fn text_button<
-    Env: WidgetEnvironment + Track + ?Sized,
-    H: ImageHandle,
-    F: Font<Env::Drawer> + Clone,
->(
-    style: Rc<TextButtonStyle<H, F>>,
+pub fn text_button<'a, Env: WidgetEnvironment + HasImageManager + Track + ?Sized>(
+    style: Rc<TextButtonStyle<RunImageHandle<Env>, RunFont<Env>>>,
     text: String,
-    on_click: impl Fn(&mut Env),
-) -> impl Widget<Env>
+    on_click: impl Fn(&mut Env) + 'a,
+) -> impl Widget<Env> + 'a
 where
-    Env::Drawer: ImageDrawer<H::Source>,
-    F::Glyph: Sized,
+    Env: 'a,
+    Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,
 {
     TextButtonBuilder {
         style,
-        is_enabled: const_(true),
-        text: const_(text),
-        on_click,
+        is_enabled: const_(true).into(),
+        text: const_(text).into(),
+        on_click: Box::new(on_click),
     }
     .build()
 }

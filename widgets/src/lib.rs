@@ -16,14 +16,22 @@ pub struct Style<I: ImageHandle, F: Clone> {
     pub button: Rc<TextButtonStyle<I, F>>,
 }
 
-/// A [`Style`] whose resources are managed by an [`ImageManager`] of type `M`.
-pub type RunStyle<M> =
-    Style<Rc<<M as ImageManager>::Handle>, ImageTTFont<M, Rc<ImageTTFontFamily<M>>>>;
+/// A [`Style`] for use in an environment of the given type.
+pub type RunStyle<Env> = Style<RunImageHandle<Env>, RunFont<Env>>;
+
+/// The image handle type used in an environment of the given type.
+pub type RunImageHandle<Env> = Rc<<<Env as HasImageManager>::ImageManager as ImageManager>::Handle>;
+
+/// The font type used in an environment of the given type.
+pub type RunFont<Env> = ImageTTFont<
+    <Env as HasImageManager>::ImageManager,
+    Rc<ImageTTFontFamily<<Env as HasImageManager>::ImageManager>>,
+>;
 
 /// Loads the default [`Style`] into the given [`WidgetEnvironment`].
 pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
     env: &Env,
-) -> RunStyle<Env::ImageManager> {
+) -> RunStyle<Env> {
     use std::num::NonZeroU32;
     use stretchable::{Band, BandMode, BandPattern};
     use uial::{size2i, vec2i, Box2i};

@@ -11,11 +11,11 @@ fn main() {
             stack_h![
                 uial_widgets::TextButtonBuilder {
                     style: style.button.clone(),
-                    is_enabled: is_enabled.clone(),
-                    text: const_("Click Me!".to_owned()),
-                    on_click: move |env: &mut _| {
+                    is_enabled: DynProperty::from_rc(is_enabled.clone()).into(),
+                    text: const_("Click Me!".to_owned()).into(),
+                    on_click: Box::new(move |env: &mut _| {
                         println!("Clicked!");
-                    }
+                    })
                 }
                 .build(),
                 widget::empty().with_width(10),
