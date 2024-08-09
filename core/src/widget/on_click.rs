@@ -62,8 +62,8 @@ impl<
         self.inner.draw(env, drawer)
     }
 
-    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
-        self.inner.identify(env, pos)
+    fn hover_feedback(&self, env: &Env, pos: Vector2i, feedback: &mut dyn FnMut(&dyn Any)) -> bool {
+        self.inner.hover_feedback(env, pos, feedback)
     }
 
     fn cursor_event(

@@ -66,7 +66,8 @@ struct RawRunEnv<'state, S: HasReact + Track + 'static> {
     state: &'state mut S,
     keys_held: &'state ReactCell<S::React, BTreeSet<KeyCode>>,
     handlers: &'state ReactCell<S::React, InteractionHandlerSet<'static, RunEnv<S>>>,
-    hover_feedback: Option<HoverFeedback>,
+    root_inst: Option<&'static dyn WidgetInst<RunEnv<S>>>,
+    cursor_pos: Option<Point2i>,
 }
 
 impl<S: HasReact + Track> HasWgpuContext<'static> for RunEnv<S> {
@@ -127,8 +128,10 @@ impl<S: HasReact + Track> WidgetEnvironment for RunEnv<S> {
     }
 
     fn interaction_feedback(&self, f: &mut dyn FnMut(&dyn std::any::Any)) {
-        if let Some(hover_feedback) = &self.raw.hover_feedback {
-            f(hover_feedback);
+        if let Some(root_inst) = self.raw.root_inst {
+            if let Some(cursor_pos) = self.raw.cursor_pos {
+                root_inst.hover_feedback(self, cursor_pos, f);
+            }
         }
         self.raw
             .handlers
@@ -311,7 +314,8 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             state: &mut state,
             keys_held: &keys_held,
             handlers: Extender::as_ref(&handlers),
-            hover_feedback: None,
+            root_inst: None,
+            cursor_pos: None,
         })));
         let sizing = widget.sizing(RunEnv::from_raw(&RawRunEnv {
             image_atlas: Extender::as_ref(&image_atlas),
@@ -319,7 +323,8 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             state: &mut state,
             keys_held: &keys_held,
             handlers: Extender::as_ref(&handlers),
-            hover_feedback: None,
+            root_inst: None,
+            cursor_pos: None,
         }));
 
         // Apply min/max window size
@@ -358,7 +363,8 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 state: &mut state,
                 keys_held: &keys_held,
                 handlers: Extender::as_ref(&handlers),
-                hover_feedback: None,
+                root_inst: None,
+                cursor_pos: None,
             }),
             RunWidgetSlot {
                 size: Extender::as_ref(&size),
@@ -367,20 +373,21 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
 
         // Begin main loop
         let mut cursor_pos = None;
-        let mut hover_feedback = None;
         let mut prev_time = std::time::Instant::now();
         let mut is_cursor_locked = false;
         event_loop.run(move |event, _, control_flow| {
             use winit::event::*;
             use winit::event_loop::*;
             let _ = (&instance, &adapter, &window);
+            let root_inst = Extender::as_ref(&inst);
             let mut raw_env = RawRunEnv {
                 image_atlas: Extender::as_ref(&image_atlas),
                 drawer_context: Extender::as_ref(&drawer_context),
                 state: &mut state,
                 keys_held: &keys_held,
                 handlers: Extender::as_ref(&handlers),
-                hover_feedback,
+                root_inst: Some(root_inst),
+                cursor_pos,
             };
             let env = RunEnv::from_raw_mut(&mut raw_env);
             let cur_time = std::time::Instant::now();
@@ -529,36 +536,6 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                     }
                 }
                 _ => {}
-            }
-
-            // Update hover feedback
-            if let Some(cursor_pos) = cursor_pos {
-                let has_cursor_interaction =
-                    handlers.with_ref(env, |handlers| handlers.cursor().is_some());
-                if !has_cursor_interaction {
-                    let hover_widget = inst.identify(env, cursor_pos);
-                    if let Some(hover_widget) = hover_widget {
-                        if let Some(hover_feedback) = &mut hover_feedback {
-                            hover_feedback.pos = cursor_pos;
-                            if hover_feedback.widget != hover_widget {
-                                hover_feedback.widget = hover_widget;
-                                hover_feedback.since = env.clock();
-                            }
-                        } else {
-                            hover_feedback = Some(HoverFeedback {
-                                widget: hover_widget,
-                                pos: cursor_pos,
-                                since: env.clock(),
-                            });
-                        }
-                    } else {
-                        hover_feedback = None;
-                    }
-                } else {
-                    hover_feedback = None;
-                }
-            } else {
-                hover_feedback = None;
             }
 
             // Update UI state

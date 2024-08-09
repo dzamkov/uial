@@ -207,8 +207,8 @@ impl<
         (self.widget.draw)(env, &mut Transform::new(drawer, proj))
     }
 
-    fn identify(&self, _: &Env, _: Vector2i) -> Option<WidgetId> {
-        None
+    fn hover_feedback(&self, _: &Env, _: Vector2i, _: &mut dyn FnMut(&dyn Any)) -> bool {
+        false
     }
 
     fn cursor_event(

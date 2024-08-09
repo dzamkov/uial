@@ -65,9 +65,10 @@ impl<Env: WidgetEnvironment + ?Sized, Below: WidgetInst<Env>, Above: WidgetInst<
         self.below.draw(env, drawer);
         self.above.draw(env, drawer);
     }
-
-    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
-        self.above.identify(env, pos).or_else(|| self.below.identify(env, pos))
+    
+    fn hover_feedback(&self, env: &Env, pos: Vector2i, feedback: &mut dyn FnMut(&dyn Any)) -> bool {
+        self.above.hover_feedback(env, pos, feedback)
+            || self.below.hover_feedback(env, pos, feedback)
     }
 
     fn cursor_event(
@@ -86,9 +87,13 @@ impl<Env: WidgetEnvironment + ?Sized, Below: WidgetInst<Env>, Above: WidgetInst<
 
     fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>> {
         if backward {
-            self.below.focus(env, backward).or_else(|| self.above.focus(env, backward))
+            self.below
+                .focus(env, backward)
+                .or_else(|| self.above.focus(env, backward))
         } else {
-            self.above.focus(env, backward).or_else(|| self.below.focus(env, backward))
+            self.above
+                .focus(env, backward)
+                .or_else(|| self.below.focus(env, backward))
         }
     }
 }

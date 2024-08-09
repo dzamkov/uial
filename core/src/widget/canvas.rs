@@ -59,8 +59,8 @@ impl<
         (self.widget.draw)(env, self.slot.size(env), drawer)
     }
 
-    fn identify(&self, _: &Env, _: Vector2i) -> Option<WidgetId> {
-        None
+    fn hover_feedback(&self, _: &Env, _: Vector2i, _: &mut dyn FnMut(&dyn Any)) -> bool {
+        false
     }
 
     fn cursor_event(&self, _: &mut Env, _: Vector2i, _: CursorEvent) -> CursorEventResponse<Env> {

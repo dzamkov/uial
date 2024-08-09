@@ -89,11 +89,15 @@ pub trait WidgetInst<Env: WidgetEnvironment + ?Sized> {
     /// Draws this [`WidgetInst`] to the given drawer.
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer);
 
-    /// Gets the interactable descendant of this [`WidgetInst`] at the given position, or [`None`]
-    /// if no such widget exists.
+    /// Calls `f` for each feedback item produced by the "hover" interaction resulting from a
+    /// cursor hovering at the given position.
     /// 
-    /// This will typically be the widget that handles cursor events at the given position.
-    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId>;
+    /// Feedback items are typically related to the descendant widget that would handle cursor
+    /// events at the given position. This returns `true` iff such cursor events would be handled,
+    /// as opposed to being "bubbled" up to a parent widget.
+    /// 
+    /// Interaction feedback can be accessed by calling [`WidgetEnvironment::interaction_feedback`].
+    fn hover_feedback(&self, env: &Env, pos: Vector2i, f: &mut dyn FnMut(&dyn Any)) -> bool;
 
     /// Processes an "initial" [`CursorEvent`] that may be within the bounds of this [`WidgetInst`]
     /// while there is no ongoing interaction involving the cursor.
@@ -164,8 +168,8 @@ impl<Env: WidgetEnvironment + ?Sized, T: WidgetInst<Env> + ?Sized> WidgetInst<En
         (**self).draw(env, drawer)
     }
 
-    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
-        (**self).identify(env, pos)
+    fn hover_feedback(&self, env: &Env, pos: Vector2i, f: &mut dyn FnMut(&dyn Any)) -> bool {
+        (**self).hover_feedback(env, pos, f)
     }
 
     fn cursor_event(

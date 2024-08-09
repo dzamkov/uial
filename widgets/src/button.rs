@@ -80,8 +80,8 @@ impl<Env: WidgetEnvironment + ?Sized> Property<Env> for ButtonStateProperty<'_, 
         }
         let mut state = ButtonState::Normal;
         env.interaction_feedback(&mut |item| {
-            if let Some(HoverFeedback { widget, .. }) = item.downcast_ref() {
-                if *widget == self.widget {
+            if let Some(HoverFeedback(id)) = item.downcast_ref() {
+                if *id == self.widget {
                     state = ButtonState::Hover;
                 }
             }
@@ -159,11 +159,17 @@ where
         )
     }
 
-    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+    fn hover_feedback(
+        &self,
+        env: &Env,
+        pos: Vector2i,
+        f: &mut dyn FnMut(&dyn std::any::Any),
+    ) -> bool {
         if self.slot.bounds(env).contains_exclusive(pos) {
-            Some(self.widget.id)
+            f(&HoverFeedback(self.widget.id));
+            true
         } else {
-            None
+            false
         }
     }
 
@@ -238,6 +244,9 @@ impl<'a, Env: WidgetEnvironment + HasImageManager + ?Sized, Slot: WidgetSlot<Env
         f(&PressedFeedback(self.widget.id));
     }
 }
+
+/// A feedback item that indicates that a [`Button`] is currently being hovered over.
+struct HoverFeedback(WidgetId);
 
 /// A feedback item that indicates that a [`Button`] is currently being pressed.
 struct PressedFeedback(WidgetId);

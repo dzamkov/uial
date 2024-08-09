@@ -260,11 +260,11 @@ impl<
         self.b.draw(env, drawer);
     }
 
-    fn identify(&self, env: &Env, pos: Vector2i) -> Option<WidgetId> {
+    fn hover_feedback(&self, env: &Env, pos: Vector2i, f: &mut dyn FnMut(&dyn Any)) -> bool {
         if self.shared.side(env, pos) {
-            self.b.identify(env, pos)
+            self.b.hover_feedback(env, pos, f)
         } else {
-            self.a.identify(env, pos)
+            self.a.hover_feedback(env, pos, f)
         }
     }
 

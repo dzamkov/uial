@@ -1,4 +1,4 @@
-use crate::{Vector2, Vector2i, WidgetEnvironment, WidgetId, Instant};
+use crate::{Vector2, Vector2i, WidgetEnvironment};
 use std::any::Any;
 use std::rc::Rc;
 
@@ -46,19 +46,6 @@ pub trait FocusInteractionHandler<'ui, Env: WidgetEnvironment + ?Sized> {
         // No feedback by default
         let _ = (env, f);
     }
-}
-
-/// A feedback item indicating that a widget is currently being hovered over.
-#[derive(Clone, Copy)]
-pub struct HoverFeedback {
-    /// The widget being hovered over.
-    pub widget: WidgetId,
-
-    /// The current position of the cursor.
-    pub pos: Vector2i,
-
-    /// The time at which the hover began.
-    pub since: Instant,
 }
 
 /// A possible response to a cursor interaction event.
