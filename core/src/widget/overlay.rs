@@ -1,4 +1,5 @@
-use super::*;
+use crate::prelude::*;
+use std::any::Any;
 
 /// Constructs a [`Widget`] by "overlaying" the given [`Widget`]s in the same layout rectangle.
 #[macro_export]
@@ -65,7 +66,7 @@ impl<Env: WidgetEnvironment + ?Sized, Below: WidgetInst<Env>, Above: WidgetInst<
         self.below.draw(env, drawer);
         self.above.draw(env, drawer);
     }
-    
+
     fn hover_feedback(&self, env: &Env, pos: Vector2i, feedback: &mut dyn FnMut(&dyn Any)) -> bool {
         self.above.hover_feedback(env, pos, feedback)
             || self.below.hover_feedback(env, pos, feedback)

@@ -4,7 +4,7 @@ use std::cell::Cell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 use uial::drawer::*;
-use uial::*;
+use uial::prelude::*;
 
 /// Describes a self-contained application.
 pub trait Application {

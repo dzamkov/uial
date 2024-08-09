@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 
 /// Contains [`Minimize`]-related extension methods for [`Widget`].
 pub trait MinimizeWidgetExt: WidgetBase + Sized {

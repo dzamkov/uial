@@ -8,7 +8,7 @@ pub use stretchable::StretchableImage;
 pub use text_button::*;
 use uial::drawer::{BorrowImageTTFontFamily, ImageTTFont, ImageTTFontFamily};
 use uial::drawer::{HasImageManager, ImageHandle, ImageManager};
-use uial::{srgba, Padding2i, WidgetEnvironment};
+use uial::prelude::{srgba, Padding2i, WidgetEnvironment};
 
 /// Encapsulates the styling information for all available widgets.
 pub struct Style<I: ImageHandle, F: Clone> {
@@ -34,7 +34,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
 ) -> RunStyle<Env> {
     use std::num::NonZeroU32;
     use stretchable::{Band, BandMode, BandPattern};
-    use uial::{size2i, vec2i, Box2i};
+    use uial::prelude::{size2i, vec2i, Box2i};
     let image_manager = env.image_manager();
     let font = Rc::new(
         ImageTTFontFamily::new(

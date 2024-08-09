@@ -1,4 +1,5 @@
-use super::*;
+use crate::prelude::*;
+use std::any::Any;
 
 /// A completely transparent and uninteractive [`Widget`] that occupies a variable amount of
 /// space.

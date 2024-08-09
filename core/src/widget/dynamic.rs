@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 use std::rc::Rc;
 
 /// A [`Widget`] of an unspecified type, determined at runtime.

@@ -2,8 +2,9 @@ mod canvas;
 mod dynamic;
 mod empty;
 mod extend;
-mod minimize;
 mod fill;
+mod label;
+mod minimize;
 mod on_click;
 mod on_key;
 mod overlay;
@@ -11,27 +12,27 @@ mod pad;
 mod restrict;
 mod stack;
 mod switch;
-mod label;
 mod zoom_canvas;
 
-use super::*;
+use crate::prelude::*;
+use crate::unique::Unique;
 pub use canvas::*;
 pub use dynamic::*;
 pub use empty::*;
 pub use extend::*;
-pub use minimize::*;
 pub use fill::*;
+pub use label::*;
+pub use minimize::*;
 pub use on_click::*;
 pub use on_key::*;
 pub use overlay::*;
 pub use pad::*;
 pub use restrict::*;
 pub use stack::*;
+use std::any::Any;
 use std::rc::Rc;
 pub use switch::*;
-pub use label::*;
 pub use zoom_canvas::*;
-use std::any::Any;
 
 /// A trait which all [`Widget`]s must implement.
 ///
@@ -91,11 +92,11 @@ pub trait WidgetInst<Env: WidgetEnvironment + ?Sized> {
 
     /// Calls `f` for each feedback item produced by the "hover" interaction resulting from a
     /// cursor hovering at the given position.
-    /// 
+    ///
     /// Feedback items are typically related to the descendant widget that would handle cursor
     /// events at the given position. This returns `true` iff such cursor events would be handled,
     /// as opposed to being "bubbled" up to a parent widget.
-    /// 
+    ///
     /// Interaction feedback can be accessed by calling [`WidgetEnvironment::interaction_feedback`].
     fn hover_feedback(&self, env: &Env, pos: Vector2i, f: &mut dyn FnMut(&dyn Any)) -> bool;
 
@@ -109,7 +110,7 @@ pub trait WidgetInst<Env: WidgetEnvironment + ?Sized> {
     ) -> CursorEventResponse<Env>;
 
     /// Called when focus enters this [`WidgetInst`].
-    /// 
+    ///
     /// The widget may request a focus interaction to begin so that it may capture future input.
     fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>>;
 
@@ -187,16 +188,16 @@ impl<Env: WidgetEnvironment + ?Sized, T: WidgetInst<Env> + ?Sized> WidgetInst<En
 }
 
 /// A unique identifier for a [`Widget`].
-/// 
+///
 /// Only certain widgets will have an [`WidgetId`], usually when it is necessary to identify it
 /// within a [`WidgetEnvironment`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct WidgetId(unique::Unique);
+pub struct WidgetId(Unique);
 
 impl WidgetId {
     /// Constructs a new [`WidgetId`], different from all other identifiers generated so far.
     pub fn new() -> Self {
-        Self(unique::Unique::new())
+        Self(Unique::new())
     }
 }
 

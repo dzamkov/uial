@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use uial::*;
+use uial::prelude::*;
 use uial_backend::*;
 
 fn main() {

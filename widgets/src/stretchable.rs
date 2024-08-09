@@ -1,6 +1,6 @@
 use std::num::NonZeroU32;
 use uial::drawer::{Image, ImageDrawer, ImageHandle};
-use uial::*;
+use uial::prelude::*;
 
 /// Annotates an [`Image`] with additional information that allows it to be stretched to
 /// arbitrary sizes (larger than the source image).

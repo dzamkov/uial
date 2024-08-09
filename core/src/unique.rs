@@ -1,5 +1,5 @@
-use std::num::NonZeroU32;
 use std::cell::Cell;
+use std::num::NonZeroU32;
 use std::sync::atomic::AtomicU32;
 
 /// A unique identifier within the scope of a single program run.

@@ -1,7 +1,6 @@
 use super::*;
 use std::rc::Rc;
-use uial::widget::{DynWidget, Widget};
-use uial::{Clock, DefaultReact, Duration};
+use uial::prelude::{Clock, DefaultReact, Duration, DynWidget, Widget};
 
 /// The state type for a [`SimpleApplication`].
 pub type SimpleState = (DefaultReact, Clock);

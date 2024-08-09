@@ -1,4 +1,7 @@
-use super::*;
+use crate::prelude::*;
+use crate::RationalU32;
+use std::any::Any;
+use std::rc::Rc;
 
 // TODO: Allow weights to be specified in macro
 // TODO: Create balanced `Stack` tree from list of parts
@@ -283,9 +286,13 @@ impl<
 
     fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>> {
         if backward {
-            self.b.focus(env, backward).or_else(|| self.a.focus(env, backward))
+            self.b
+                .focus(env, backward)
+                .or_else(|| self.a.focus(env, backward))
         } else {
-            self.a.focus(env, backward).or_else(|| self.b.focus(env, backward))
+            self.a
+                .focus(env, backward)
+                .or_else(|| self.b.focus(env, backward))
         }
     }
 }

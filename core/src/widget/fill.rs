@@ -1,5 +1,6 @@
-use super::*;
 use crate::drawer::RasterDrawer;
+use crate::prelude::*;
+use std::any::Any;
 
 /// A [`Widget`] that displays as a simple filled rectangle.
 pub struct Fill {

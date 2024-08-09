@@ -1,4 +1,5 @@
-use super::*;
+use crate::prelude::*;
+use crate::RationalU32;
 
 /// Contains [`Extend`]-related extension methods for [`Widget`].
 pub trait ExtendWidgetExt: WidgetBase + Sized {

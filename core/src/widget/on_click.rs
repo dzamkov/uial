@@ -1,4 +1,6 @@
-use super::*;
+use crate::prelude::*;
+use std::any::Any;
+use std::rc::Rc;
 
 /// Contains [`OnClick`]-related extension methods for [`Widget`]s.
 pub trait OnClickWidgetExt<Env: WidgetEnvironment + ?Sized>: Widget<Env> + Sized {

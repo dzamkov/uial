@@ -1,6 +1,7 @@
-use super::*;
 use crate::drawer::{Font, FontBase, RasterDrawer, TextBuffer, TextDrawer, TextWriter};
-use uial_geometry::Dir2i;
+use crate::geometry::Dir2i;
+use crate::prelude::*;
+use std::any::Any;
 
 /// A [`Widget`] which displays a text label.
 ///

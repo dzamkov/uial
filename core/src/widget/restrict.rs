@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 
 /// Contains [`Restrict`]-related extension methods for [`Widget`].
 pub trait RestrictWidgetExt: WidgetBase + Sized {

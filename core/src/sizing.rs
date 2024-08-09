@@ -200,7 +200,7 @@ impl Sizing {
     }
 
     /// Constructs a [`Sizing`] consisting of the [`Size2i`]s, `size2i(x, y)`, that minimize `x`.
-    /// 
+    ///
     /// i.e. `size2i(x, y)` is in the returned set if it is in this set and `size2i(x + i, y)` is
     /// not for every `i > 0`.
     pub fn minimize_x(&self) -> Self {
@@ -213,7 +213,7 @@ impl Sizing {
     }
 
     /// Constructs a [`Sizing`] consisting of the [`Size2i`]s, `size2i(x, y)`, that minimize `y`.
-    /// 
+    ///
     /// i.e. `size2i(x, y)` is in the returned set if it is in this set and `size2i(x, y + i)` is
     /// not for every `i > 0`.
     pub fn minimize_y(&self) -> Self {

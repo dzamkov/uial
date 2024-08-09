@@ -1,7 +1,7 @@
 use crate::{RunImageHandle, StretchableImage};
 use std::rc::Rc;
 use uial::drawer::{HasImageManager, ImageDrawer, ImageHandle, ImageManager};
-use uial::*;
+use uial::prelude::*;
 
 /// A [`Widget`] which displays a clickable button (just the base, without any internal content).
 pub struct Button<'a, Env: WidgetEnvironment + HasImageManager + ?Sized> {

@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 
 /// Contains [`Pad`]-related extension methods for [`Widget`].
 pub trait PadWidgetExt: WidgetBase + Sized {

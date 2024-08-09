@@ -1,8 +1,8 @@
-use uial::*;
-use uial::widget::Camera;
-use uial::drawer::*;
-use uial_backend::*;
 use std::rc::Rc;
+use uial::drawer::*;
+use uial::widget::Camera;
+use uial::prelude::*;
+use uial_backend::*;
 
 fn main() {
     const CIRCLES: &[(Vector2, Scalar)] = &[
@@ -48,14 +48,14 @@ fn main() {
                     drawer.draw_circle(srgb(1.0, 1.0, 0.8).into(), c, r)
                 }
             })
-            .on_key(move |env, key| {
-                match key.key_code {
-                    Some(winit::event::VirtualKeyCode::R) => {
-                        (&camera).current().set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));
-                        true
-                    }
-                    _ => false
+            .on_key(move |env, key| match key.key_code {
+                Some(winit::event::VirtualKeyCode::R) => {
+                    (&camera)
+                        .current()
+                        .set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));
+                    true
                 }
+                _ => false,
             })
             .into_rc_dyn()
         },

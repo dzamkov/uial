@@ -1,4 +1,5 @@
-use super::*;
+use crate::prelude::*;
+use std::any::Any;
 use std::marker::PhantomData;
 
 /// A non-interactive [`Widget`] which is drawn using a custom closure.

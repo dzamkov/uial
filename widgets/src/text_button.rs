@@ -1,7 +1,7 @@
 use crate::{ButtonStyle, RunFont, RunImageHandle};
 use std::rc::Rc;
 use uial::drawer::{HasImageManager, ImageDrawer, ImageHandle, ImageManager};
-use uial::*;
+use uial::prelude::*;
 
 /// A helper for constructing a text button widget.
 pub struct TextButtonBuilder<'a, Env: WidgetEnvironment + HasImageManager + Track + ?Sized> {

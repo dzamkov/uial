@@ -1,6 +1,6 @@
 use std::rc::Rc;
 use uial::drawer::*;
-use uial::*;
+use uial::prelude::*;
 use uial_backend::*;
 
 fn main() {
