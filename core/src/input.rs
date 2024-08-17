@@ -180,7 +180,7 @@ pub struct Key {
 }
 
 /// Symbolic identifier for a keyboard key.
-pub type KeyCode = winit::event::VirtualKeyCode;
+pub use winit::event::VirtualKeyCode as KeyCode;
 
 impl<'ui, Env: WidgetEnvironment + ?Sized, T: CursorInteractionHandler<'ui, Env> + ?Sized>
     CursorInteractionHandler<'ui, Env> for &T
