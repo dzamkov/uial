@@ -238,14 +238,10 @@ impl<'ui, Back: ?Sized + 'ui, Env: WidgetEnvironment + ?Sized + 'ui>
 /// Given a [`CursorInteractionRequest`] whose handler may contain references into a `Rc<T>` value,
 /// wraps it in a [`Dependent`] to ensure that the value is kept alive while the interaction is
 /// active.
-unsafe fn wrap_cursor_interaction<'a, 'b, T: ?Sized, Env: WidgetEnvironment + ?Sized>(
+unsafe fn wrap_cursor_interaction<'a, 'b, T: ?Sized + 'b, Env: WidgetEnvironment + ?Sized + 'b>(
     inner: &Rc<T>,
     req: CursorInteractionRequest<'a, Env>,
-) -> CursorInteractionRequest<'b, Env>
-where
-    T: 'b,
-    Env: 'b,
-{
+) -> CursorInteractionRequest<'b, Env> {
     let handler: Rc<dyn CursorInteractionHandler<'a, Env> + 'a> = req.handler;
     let handler: Rc<dyn CursorInteractionHandler<'b, Env> + 'b> =
         unsafe { std::mem::transmute(handler) };
@@ -261,14 +257,10 @@ where
 /// Given a [`FocusInteractionRequest`] whose handler may contain references into a `Rc<T>` value,
 /// wraps it in a [`Dependent`] to ensure that the value is kept alive while the interaction is
 /// active.
-unsafe fn wrap_focus_interaction<'a, 'b, T: ?Sized, Env: WidgetEnvironment + ?Sized>(
+unsafe fn wrap_focus_interaction<'a, 'b, T: ?Sized + 'b, Env: WidgetEnvironment + ?Sized + 'b>(
     inner: &Rc<T>,
     req: FocusInteractionRequest<'a, Env>,
-) -> FocusInteractionRequest<'b, Env>
-where
-    T: 'b,
-    Env: 'b,
-{
+) -> FocusInteractionRequest<'b, Env> {
     let handler: Rc<dyn FocusInteractionHandler<'a, Env> + 'a> = req.handler;
     let handler: Rc<dyn FocusInteractionHandler<'b, Env> + 'b> =
         unsafe { std::mem::transmute(handler) };

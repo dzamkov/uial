@@ -5,17 +5,17 @@ edition = "2021"
 
 [dependencies]
 uial-geometry = { path = "../geometry" }
-renege = "0.1.1"
-derive_more = "0.99.17"
-winit = "0.28.3"
-palette = "0.7.1"
-image = "0.24.6"
+renege = "0.1.2"
+derive_more = { version = "1.0.0", features = ["full"] }
+winit = "0.29"
+palette = "0.7.6"
+image = "0.25.2"
 guillotiere = "0.6.2"
-ttf-parser = "0.19.0"
+ttf-parser = "0.24.1"
 ab_glyph_rasterizer = "0.1.8"
-ghost-cell = "0.2.3"
+ghost-cell = "0.2.6"
 rand = "0.8.5"
-num-rational = { version = "0.4.1", default-features = false }
+num-rational = { version = "0.4.2", default-features = false }
 
 [dev-dependencies]
 uial-backend = { path = "../backend" }

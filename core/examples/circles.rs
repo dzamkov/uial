@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use uial::drawer::*;
-use uial::widget::Camera;
 use uial::prelude::*;
+use uial::widget::Camera;
 use uial_backend::*;
 
 fn main() {
@@ -49,7 +49,7 @@ fn main() {
                 }
             })
             .on_key(move |env, key| match key.key_code {
-                Some(winit::event::VirtualKeyCode::R) => {
+                Some(KeyCode::KeyR) => {
                     (&camera)
                         .current()
                         .set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));

@@ -7,7 +7,8 @@ pub use self::image::*;
 pub use self::quad::*;
 use ::wgpu;
 use bytemuck::{Pod, Zeroable};
-use std::{borrow::Cow, ops::Range, rc::Rc};
+use std::borrow::Cow;
+use std::ops::Range;
 use uial::drawer::*;
 use uial::geometry::*;
 use wgpu::util::DeviceExt;
@@ -107,6 +108,7 @@ impl<'a> WgpuDrawerContext<'a> {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: "vs_main",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(), 
                     buffers: &[DrawVertex::LAYOUT],
                 },
                 primitive: wgpu::PrimitiveState {
@@ -126,6 +128,7 @@ impl<'a> WgpuDrawerContext<'a> {
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: "fs_main",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(), 
                     targets: &[Some(wgpu::ColorTargetState {
                         format: draw_format,
                         blend: Some(wgpu::BlendState {
@@ -144,6 +147,7 @@ impl<'a> WgpuDrawerContext<'a> {
                     })],
                 }),
                 multiview: None,
+                cache: None
             })
         };
         let line_pipeline = create_pipeline(wgpu::PrimitiveTopology::LineList);
@@ -230,7 +234,6 @@ impl<'a> WgpuDrawerContext<'a> {
         // Begin render pass
         let vertex_buffer;
         let index_buffer;
-        let mut holdings: Vec<Rc<dyn Something + 'pass>> = Vec::new();
         let mut encoder = self
             .context
             .device
@@ -243,17 +246,18 @@ impl<'a> WgpuDrawerContext<'a> {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &resources.depth_stencil_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(0.0),
-                        store: false,
+                        store: wgpu::StoreOp::Discard,
                     }),
                     stencil_ops: None,
                 }),
+                ..Default::default()
             });
 
             // Make common bind group available
@@ -264,14 +268,10 @@ impl<'a> WgpuDrawerContext<'a> {
             // the lifting the lifetime should be okay.
             let rpass: wgpu::RenderPass = unsafe { std::mem::transmute(rpass) };
 
-            // TODO: Stop being lazy and figure out why/whether this is okay
-            let holdings = unsafe { std::mem::transmute(&mut holdings) };
-
             // Do drawing to buffers
             let mut drawer = WgpuDrawer {
                 output_size: resources.size,
                 rpass,
-                holdings,
                 next_layer: 1,
                 white_uv,
                 verts: Vec::new(),
@@ -450,7 +450,6 @@ enum DrawCall {
 pub struct WgpuDrawer<'pass> {
     output_size: Size2i,
     rpass: wgpu::RenderPass<'pass>,
-    holdings: &'pass mut Vec<Rc<dyn Something + 'pass>>,
     next_layer: u32,
     white_uv: Vector2,
     verts: Vec<DrawVertex>,
@@ -458,10 +457,6 @@ pub struct WgpuDrawer<'pass> {
     opaque_tris: Vec<u32>,
     extra_draws: Vec<ExtraDraw>,
 }
-
-// Placeholder traits for type erasure.
-trait Something {}
-impl<T> Something for T {}
 
 /// Describes an extra draw call to be performed after the general opaque draw calls. For example,
 /// this is used to maintain the ordering of draw calls that contain translucent content.
@@ -478,18 +473,6 @@ impl<'pass> WgpuDrawer<'pass> {
     /// drawing with custom pipelines.
     pub fn render_pass(&mut self) -> &mut wgpu::RenderPass<'pass> {
         &mut self.rpass
-    }
-
-    /// Have the [`WgpuDrawer`] hold a strong reference to a value until the render pass is
-    /// submitted. This is useful for prolonging the lifetimes of resources passed to
-    /// [`WgpuDrawer::render_pass`] in order to satisfy lifetime constraints.
-    pub fn hold<T>(&mut self, obj: Rc<T>) -> &'pass T {
-        let res = &*obj as *const T;
-        self.holdings.push(obj);
-
-        // SAFETY: Since the container of `res` is being held in a vector with a lifetime
-        // of `'pass`, `res` should be alive for at least that long.
-        unsafe { &*res }
     }
 
     /// Gets the next layer index for a drawable object. Layers are used with the depth buffer to

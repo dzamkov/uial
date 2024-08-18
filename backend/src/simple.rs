@@ -30,7 +30,7 @@ impl Application for SimpleApplication {
 
 impl SimpleApplication {
     /// Runs this [`SimpleApplication`].
-    pub fn run(self) -> ! {
+    pub fn run(self) {
         let state = (
             unsafe { DefaultReact::new_static() },
             Clock::new(Duration::ZERO),

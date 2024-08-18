@@ -30,7 +30,7 @@ pub trait Property<Env: ?Sized>: PropertyBase {
     where
         Self::Value: ToOwned,
     {
-        self.with_ref(env, |x| x.to_owned())
+        Property::with_ref(self, env, |x| x.to_owned())
     }
 }
 

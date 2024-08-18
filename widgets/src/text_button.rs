@@ -84,13 +84,12 @@ impl<Env: ?Sized, E: Property<Env, Value = bool>, T: Property<Env>> Property<Env
 }
 
 /// Shortcut for creating a text button that is always enabled.
-pub fn text_button<'a, Env: WidgetEnvironment + HasImageManager + Track + ?Sized>(
+pub fn text_button<'a, Env: WidgetEnvironment + HasImageManager + Track + ?Sized + 'a>(
     style: Rc<TextButtonStyle<RunImageHandle<Env>, RunFont<Env>>>,
     text: String,
     on_click: impl Fn(&mut Env) + 'a,
 ) -> impl Widget<Env> + 'a
 where
-    Env: 'a,
     Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,
 {
     TextButtonBuilder {

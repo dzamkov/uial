@@ -259,8 +259,8 @@ enum DynInteractionHandler<'ui, Env: WidgetEnvironment + ?Sized> {
 }
 
 /// Initializes and runs an [`Application`].
-pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
-    let event_loop = winit::event_loop::EventLoop::new();
+pub fn run<App: Application + 'static>(app: App, mut state: App::State) {
+    let event_loop = winit::event_loop::EventLoop::new().unwrap();
     let window = winit::window::WindowBuilder::new()
         .with_title(app.title())
         .build(&event_loop)
@@ -271,7 +271,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             backends: wgpu::Backends::all(),
             ..Default::default()
         });
-        let surface = unsafe { instance.create_surface(&window).unwrap() };
+        let surface = instance.create_surface(&window).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -284,8 +284,9 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default().using_resolution(adapter.limits()),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default().using_resolution(adapter.limits()),
+                    memory_hints: wgpu::MemoryHints::default(),
                 },
                 None,
             )
@@ -333,7 +334,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
         if let Some((min, max)) = sizing.as_range() {
             size.x = u32::clamp(size.x, min.x, max.x);
             size.y = u32::clamp(size.y, min.y, max.y);
-            window.set_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
+            let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
             window.set_min_inner_size(Some(winit::dpi::PhysicalSize::new(min.x, min.y)));
             window.set_max_inner_size(if max.x < u32::MAX && max.y < u32::MAX {
                 Some(winit::dpi::PhysicalSize::new(max.x, max.y))
@@ -349,6 +350,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             width: size.x,
             height: size.y,
             present_mode: wgpu::PresentMode::Fifo,
+            desired_maximum_frame_latency: 2,
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
         };
@@ -375,10 +377,10 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
         let mut cursor_pos = None;
         let mut prev_time = std::time::Instant::now();
         let mut is_cursor_locked = false;
-        event_loop.run(move |event, _, control_flow| {
+        let window = &window;
+        let res = event_loop.run(move |event, target| {
             use winit::event::*;
-            use winit::event_loop::*;
-            let _ = (&instance, &adapter, &window);
+            let _ = (&instance, &adapter);
             let root_inst = Extender::as_ref(&inst);
             let mut raw_env = RawRunEnv {
                 image_atlas: Extender::as_ref(&image_atlas),
@@ -393,7 +395,6 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
             let cur_time = std::time::Instant::now();
             app.update(env, (cur_time - prev_time).try_into().unwrap());
             prev_time = cur_time;
-            *control_flow = ControlFlow::Poll;
 
             // Respond to event
             #[allow(clippy::collapsible_match)]
@@ -421,26 +422,31 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                             });
                         }
                     }
-                    WindowEvent::KeyboardInput { input, .. } => {
-                        if let Some(key_code) = input.virtual_keycode {
-                            keys_held.with_mut(env, |keys_held| {
-                                if input.state == ElementState::Pressed {
-                                    keys_held.insert(key_code);
-                                } else {
-                                    keys_held.remove(&key_code);
-                                }
-                            });
-                        }
+                    WindowEvent::KeyboardInput {
+                        event:
+                            KeyEvent {
+                                physical_key: winit::keyboard::PhysicalKey::Code(key_code),
+                                state,
+                                ..
+                            },
+                        ..
+                    } => {
+                        keys_held.with_mut(env, |keys_held| {
+                            if state == ElementState::Pressed {
+                                keys_held.insert(key_code);
+                            } else {
+                                keys_held.remove(&key_code);
+                            }
+                        });
                         process_general_event(
                             env,
                             &handlers,
                             cursor_pos,
                             GeneralEvent::Key {
                                 key: Key {
-                                    scan_code: input.scancode,
-                                    key_code: input.virtual_keycode,
+                                    key_code: Some(key_code),
                                 },
-                                is_down: input.state == ElementState::Pressed,
+                                is_down: state == ElementState::Pressed,
                             },
                         );
                     }
@@ -474,7 +480,35 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                             },
                         );
                     }
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    WindowEvent::RedrawRequested => {
+                        let frame = match surface.get_current_texture() {
+                            Ok(frame) => frame,
+                            Err(wgpu::SurfaceError::Timeout) => surface
+                                .get_current_texture()
+                                .expect("Failed to acquire next swap chain texture"),
+                            Err(_) => {
+                                surface.configure(&context.device, &config);
+                                surface
+                                    .get_current_texture()
+                                    .expect("Failed to acquire next swap chain texture")
+                            }
+                        };
+                        let view = frame
+                            .texture
+                            .create_view(&wgpu::TextureViewDescriptor::default());
+                        let size = size2i(config.width, config.height);
+                        let mut resources = match drawer_resources.take() {
+                            Some(resources) if resources.size() == size => resources,
+                            _ => WgpuDrawerResources::new(Extender::as_ref(&drawer_context), size),
+                        };
+                        drawer_context.draw_to(&mut resources, &view, |drawer| {
+                            inst.draw(env, WgpuErasedDrawer::from_mut(drawer))
+                        });
+                        drawer_resources.set(Some(resources));
+                        frame.present();
+                        window.request_redraw();
+                    }
+                    WindowEvent::CloseRequested => target.exit(),
                     _ => {}
                 },
                 Event::DeviceEvent { event, .. } =>
@@ -493,37 +527,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                         _ => {}
                     }
                 }
-                Event::MainEventsCleared => {
-                    window.request_redraw();
-                }
-                Event::RedrawRequested(_) => {
-                    let frame = match surface.get_current_texture() {
-                        Ok(frame) => frame,
-                        Err(wgpu::SurfaceError::Timeout) => surface
-                            .get_current_texture()
-                            .expect("Failed to acquire next swap chain texture"),
-                        Err(_) => {
-                            surface.configure(&context.device, &config);
-                            surface
-                                .get_current_texture()
-                                .expect("Failed to acquire next swap chain texture")
-                        }
-                    };
-                    let view = frame
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
-                    let size = size2i(config.width, config.height);
-                    let mut resources = match drawer_resources.take() {
-                        Some(resources) if resources.size() == size => resources,
-                        _ => WgpuDrawerResources::new(Extender::as_ref(&drawer_context), size),
-                    };
-                    drawer_context.draw_to(&mut resources, &view, |drawer| {
-                        inst.draw(env, WgpuErasedDrawer::from_mut(drawer))
-                    });
-                    drawer_resources.set(Some(resources));
-                    frame.present();
-                }
-                Event::LoopDestroyed => {
+                Event::LoopExiting => {
                     drop(drawer_resources.take());
                     unsafe {
                         Extender::drop(&mut handlers);
@@ -534,6 +538,7 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                         Extender::drop(&mut image_atlas);
                         Extender::drop(&mut context);
                     }
+                    return;
                 }
                 _ => {}
             }
@@ -559,27 +564,12 @@ pub fn run<App: Application + 'static>(app: App, mut state: App::State) -> ! {
                 }
             }
         });
+        res.unwrap()
     };
     #[cfg(not(target_arch = "wasm32"))]
     {
         let _ = env_logger::try_init();
-        pollster::block_on(inner)
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("could not initialize logger");
-        use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(window.canvas()))
-                    .ok()
-            })
-            .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(inner);
+        pollster::block_on(inner);
     }
 }
 

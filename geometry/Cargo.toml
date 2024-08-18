@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-derive_more = "0.99.17"
-thiserror = "1.0.40"
+derive_more = { version = "1.0.0", features = ["full"] }
+thiserror = "1.0.63"
 approx = "0.5.1"
-num-rational = { version = "0.4.1", default-features = false }
-bytemuck = { version = "1.16.1", features = ["derive"] }
+num-rational = { version = "0.4.2", default-features = false }
+bytemuck = { version = "1.17.0", features = ["derive"] }

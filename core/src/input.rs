@@ -175,12 +175,11 @@ pub type MouseScrollDelta = winit::event::MouseScrollDelta;
 /// Identifies/describes a keyboard key.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct Key {
-    pub scan_code: winit::event::ScanCode,
     pub key_code: Option<KeyCode>,
 }
 
 /// Symbolic identifier for a keyboard key.
-pub use winit::event::VirtualKeyCode as KeyCode;
+pub use winit::keyboard::KeyCode;
 
 impl<'ui, Env: WidgetEnvironment + ?Sized, T: CursorInteractionHandler<'ui, Env> + ?Sized>
     CursorInteractionHandler<'ui, Env> for &T
