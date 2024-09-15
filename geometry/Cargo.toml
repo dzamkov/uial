@@ -8,4 +8,4 @@ derive_more = { version = "1.0.0", features = ["full"] }
 thiserror = "1.0.63"
 approx = "0.5.1"
 num-rational = { version = "0.4.2", default-features = false }
-bytemuck = { version = "1.17.0", features = ["derive"] }
+bytemuck = { version = "1.18.0", features = ["derive"] }

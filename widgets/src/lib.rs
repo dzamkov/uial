@@ -41,7 +41,7 @@ pub fn load_default_style<Env: WidgetEnvironment + HasImageManager + ?Sized>(
             include_bytes!("default.otb")[..]
                 .to_owned()
                 .into_boxed_slice(),
-            image_manager,
+            image_manager.clone(),
         )
         .unwrap(),
     );

@@ -36,29 +36,25 @@ fn main() {
         (vec2(66.961815, 34.18946), 2.0),
         (vec2(65.24236, 36.647804), 1.0),
     ];
-    SimpleApplication {
-        title: "Circles",
-        body: &|env| {
-            let camera = Rc::new(env.react().new_cell(Trajectory::new(
-                Instant::ZERO,
-                Camera::new(vec2(0.0, 0.0), 5.0, -8.0),
-            )));
-            widget::zoom_canvas(camera.clone().current(), |_, drawer| {
-                for (c, r) in CIRCLES.iter().copied() {
-                    drawer.draw_circle(srgb(1.0, 1.0, 0.8).into(), c, r)
-                }
-            })
-            .on_key(move |env, key| match key.key_code {
-                Some(KeyCode::KeyR) => {
-                    (&camera)
-                        .current()
-                        .set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));
-                    true
-                }
-                _ => false,
-            })
-            .into_rc_dyn()
-        },
-    }
-    .run();
+    run("Circles", &|env| {
+        let camera = Rc::new(env.react().new_cell(Trajectory::new(
+            Instant::ZERO,
+            Camera::new(vec2(0.0, 0.0), 5.0, -8.0),
+        )));
+        widget::zoom_canvas(camera.clone().current(), |_, drawer| {
+            for (c, r) in CIRCLES.iter().copied() {
+                drawer.draw_circle(srgb(1.0, 1.0, 0.8).into(), c, r)
+            }
+        })
+        .on_key(move |env, key| match key.key_code {
+            Some(KeyCode::KeyR) => {
+                (&camera)
+                    .current()
+                    .set(env, Camera::new(vec2(0.0, 0.0), 5.0, -8.0));
+                true
+            }
+            _ => false,
+        })
+        .into_rc_dyn()
+    })
 }

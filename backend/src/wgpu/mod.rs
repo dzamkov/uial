@@ -9,14 +9,15 @@ use ::wgpu;
 use bytemuck::{Pod, Zeroable};
 use std::borrow::Cow;
 use std::ops::Range;
+use std::sync::Arc;
 use uial::drawer::*;
 use uial::geometry::*;
 use wgpu::util::DeviceExt;
 
 /// An "environment" which provides a [`WgpuContext`].
-pub trait HasWgpuContext<'wgpu> {
+pub trait HasWgpuContext {
     /// Gets the [`WgpuContext`] for this environment.
-    fn wgpu_context(&self) -> &'wgpu WgpuContext;
+    fn wgpu_context(&self) -> &Arc<WgpuContext>;
 }
 
 /// Encapsulates a WebGPU context.
@@ -26,27 +27,27 @@ pub struct WgpuContext {
 }
 
 /// An "environment" which provides a [`WgpuDrawerContext`].
-pub trait HasWgpuDrawerContext<'wgpu> {
+pub trait HasWgpuDrawerContext {
     /// Gets the [`WgpuContext`] for this environment.
-    fn wgpu_drawer_context(&self) -> &'wgpu WgpuDrawerContext<'wgpu>;
+    fn wgpu_drawer_context(&self) -> &Arc<WgpuDrawerContext>;
 }
 
 /// Contains the context and resources needed to create a [`WgpuDrawer`].
-pub struct WgpuDrawerContext<'a> {
-    context: &'a WgpuContext,
+pub struct WgpuDrawerContext {
+    context: Arc<WgpuContext>,
     draw_format: wgpu::TextureFormat,
-    white_image: Image<WgpuImageHandle<'a>>,
+    white_image: Image<WgpuImageHandle>,
     bind_group_layout_0: wgpu::BindGroupLayout,
     line_pipeline: wgpu::RenderPipeline,
     tri_pipeline: wgpu::RenderPipeline,
     bind_group_1: wgpu::BindGroup,
 }
 
-impl<'a> WgpuDrawerContext<'a> {
+impl WgpuDrawerContext {
     /// Creates a [`WgpuDrawerContext`] for the given [`WgpuContext`].
     pub fn new(
-        context: &'a WgpuContext,
-        image_atlas: &'a WgpuImageAtlas<'a>,
+        context: Arc<WgpuContext>,
+        image_atlas: Arc<WgpuImageAtlas>,
         draw_format: wgpu::TextureFormat,
     ) -> Self {
         let device = &context.device;
@@ -202,8 +203,8 @@ impl<'a> WgpuDrawerContext<'a> {
     }
 
     /// Gets the [`WgpuContext`] this [`WgpuDrawerContext`] is for.
-    pub fn context(&self) -> &'a WgpuContext {
-        self.context
+    pub fn context(&self) -> &Arc<WgpuContext> {
+        &self.context
     }
 
     /// Gets the [`wgpu::TextureFormat`] required for the target of a [`WgpuDrawer`] constructed
@@ -367,7 +368,7 @@ pub struct WgpuDrawerResources {
 impl WgpuDrawerResources {
     /// Creates new [`WgpuDrawerResources`] for a draw target of the given size.
     pub fn new(drawer_context: &WgpuDrawerContext, size: Size2i) -> Self {
-        let context = drawer_context.context;
+        let context = &*drawer_context.context;
 
         // Create uniforms buffer
         let scale_x = 2.0 / (size.x as f32);
@@ -634,11 +635,11 @@ impl RasterDrawer for WgpuDrawer<'_> {
     }
 }
 
-impl ImageDrawer<WgpuImageAtlas<'_>> for WgpuDrawer<'_> {
+impl ImageDrawer<WgpuImageAtlas> for WgpuDrawer<'_> {
     #[allow(clippy::identity_op)]
     fn draw_image(
         &mut self,
-        image: Image<&WgpuImageAtlas<'_>>,
+        image: Image<&WgpuImageAtlas>,
         paint: Paint,
         trans: Ortho2i,
     ) {

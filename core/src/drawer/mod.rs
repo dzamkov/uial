@@ -216,10 +216,10 @@ pub trait ImageManager {
 /// An environment that has a preferred [`ImageManager`].
 pub trait HasImageManager {
     /// The type of [`ImageManager`] for this environment.
-    type ImageManager: ImageManager + Copy;
+    type ImageManager: ImageManager + Clone;
 
     /// Gets the [`ImageManager`] for this environment.
-    fn image_manager(&self) -> Self::ImageManager;
+    fn image_manager(&self) -> &Self::ImageManager;
 }
 
 /// A [`RasterDrawer`] which can draw images from a particular kind of [`ImageSource`].
@@ -230,7 +230,31 @@ pub trait ImageDrawer<Store: ImageSource + ?Sized>: RasterDrawer {
     fn draw_image(&mut self, image: Image<&Store>, paint: Paint, trans: Ortho2i);
 }
 
-impl<T: ImageManager> ImageManager for &T {
+impl<T: ImageManager + ?Sized> ImageManager for &T {
+    type Source = T::Source;
+    type Handle = T::Handle;
+    fn load_image(&self, source: image::DynamicImage) -> Image<T::Handle> {
+        (**self).load_image(source)
+    }
+}
+
+impl<T: ImageManager + ?Sized> ImageManager for Box<T> {
+    type Source = T::Source;
+    type Handle = T::Handle;
+    fn load_image(&self, source: image::DynamicImage) -> Image<T::Handle> {
+        (**self).load_image(source)
+    }
+}
+
+impl<T: ImageManager + ?Sized> ImageManager for Rc<T> {
+    type Source = T::Source;
+    type Handle = T::Handle;
+    fn load_image(&self, source: image::DynamicImage) -> Image<T::Handle> {
+        (**self).load_image(source)
+    }
+}
+
+impl<T: ImageManager + ?Sized> ImageManager for Arc<T> {
     type Source = T::Source;
     type Handle = T::Handle;
     fn load_image(&self, source: image::DynamicImage) -> Image<T::Handle> {

@@ -7,7 +7,7 @@ edition = "2021"
 uial-geometry = { path = "../geometry" }
 renege = "0.1.2"
 derive_more = { version = "1.0.0", features = ["full"] }
-winit = "0.29"
+winit = "0.30"
 palette = "0.7.6"
 image = "0.25.2"
 guillotiere = "0.6.2"

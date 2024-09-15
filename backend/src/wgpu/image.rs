@@ -1,20 +1,24 @@
 use super::*;
 use ::image;
 use ::wgpu;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, Weak};
 
 /// Manages a texture which assembles a set of images of different sizes. Images may be added or
 /// removed from the atlas dynamically.
-pub struct WgpuImageAtlas<'a> {
-    context: &'a WgpuContext,
+///
+/// The [`WgpuImageAtlas`] must be stored inside an [`Arc`] so that images allocated from it can
+/// maintain a reference to it.
+pub struct WgpuImageAtlas {
+    context: Arc<WgpuContext>,
     pub(super) texture: wgpu::Texture,
     pub(super) texture_size: u32,
     allocator: Mutex<guillotiere::AtlasAllocator>,
+    weak_self: Weak<Self>,
 }
 
-impl<'a> WgpuImageAtlas<'a> {
-    /// Constructs a new [`WgpuImageAtlas`].
-    pub fn new(context: &'a WgpuContext) -> Self {
+impl WgpuImageAtlas {
+    /// Constructs a new [`WgpuImageAtlas`] inside of an [`Arc`].
+    pub fn new_arc(context: Arc<WgpuContext>) -> Arc<Self> {
         let texture_size = 4096;
         let texture = context.device.create_texture(&wgpu::TextureDescriptor {
             label: None,
@@ -34,28 +38,29 @@ impl<'a> WgpuImageAtlas<'a> {
             texture_size as i32,
             texture_size as i32,
         )));
-        Self {
+        Arc::new_cyclic(|weak_self| Self {
             context,
             texture,
             texture_size,
             allocator,
-        }
+            weak_self: weak_self.clone(),
+        })
     }
 
     /// Gets the [`WgpuContext`] for this [`WgpuImageAtlas`].
-    pub fn context(&self) -> &'a WgpuContext {
-        self.context
+    pub fn context(&self) -> &Arc<WgpuContext> {
+        &self.context
     }
 }
 
-impl<'a> ImageHandle for WgpuImageAtlas<'a> {
-    type Source = WgpuImageAtlas<'a>;
-    fn source(&self) -> &WgpuImageAtlas<'a> {
+impl ImageHandle for WgpuImageAtlas {
+    type Source = WgpuImageAtlas;
+    fn source(&self) -> &WgpuImageAtlas {
         self
     }
 }
 
-impl ImageSource for WgpuImageAtlas<'_> {
+impl ImageSource for WgpuImageAtlas {
     type Rect = Box2i;
 
     fn image_size(&self, rect: Box2i) -> Size2i {
@@ -74,10 +79,10 @@ impl ImageSource for WgpuImageAtlas<'_> {
     }
 }
 
-impl<'a> ImageManager for &'a WgpuImageAtlas<'a> {
-    type Source = WgpuImageAtlas<'a>;
-    type Handle = WgpuImageHandle<'a>;
-    fn load_image(&self, source: image::DynamicImage) -> Image<WgpuImageHandle<'a>> {
+impl ImageManager for WgpuImageAtlas {
+    type Source = WgpuImageAtlas;
+    type Handle = WgpuImageHandle;
+    fn load_image(&self, source: image::DynamicImage) -> Image<WgpuImageHandle> {
         let size = guillotiere::size2(source.width() as i32, source.height() as i32);
         let mut allocator = self.allocator.lock().unwrap();
         if let Some(alloc) = allocator.allocate(size) {
@@ -106,7 +111,10 @@ impl<'a> ImageManager for &'a WgpuImageAtlas<'a> {
             );
             let rect = alloc.rectangle;
             Image::new(
-                WgpuImageHandle { atlas: self, alloc },
+                WgpuImageHandle {
+                    atlas: self.weak_self.upgrade().unwrap(),
+                    alloc,
+                },
                 Box2i::from_min_max(vec2i(rect.min.x, rect.min.y), vec2i(rect.max.x, rect.max.y)),
             )
         } else {
@@ -116,19 +124,19 @@ impl<'a> ImageManager for &'a WgpuImageAtlas<'a> {
 }
 
 /// A handle to an allocated image in a [`WgpuImageAtlas`].
-pub struct WgpuImageHandle<'a> {
-    atlas: &'a WgpuImageAtlas<'a>,
+pub struct WgpuImageHandle {
+    atlas: Arc<WgpuImageAtlas>,
     alloc: guillotiere::Allocation,
 }
 
-impl<'a> ImageHandle for WgpuImageHandle<'a> {
-    type Source = WgpuImageAtlas<'a>;
-    fn source(&self) -> &WgpuImageAtlas<'a> {
-        self.atlas
+impl ImageHandle for WgpuImageHandle {
+    type Source = WgpuImageAtlas;
+    fn source(&self) -> &WgpuImageAtlas {
+        &self.atlas
     }
 }
 
-impl Drop for WgpuImageHandle<'_> {
+impl Drop for WgpuImageHandle {
     fn drop(&mut self) {
         let mut allocator = self.atlas.allocator.lock().unwrap();
         allocator.deallocate(self.alloc.id);

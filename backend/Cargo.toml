@@ -8,8 +8,8 @@ uial = { path = "../core" }
 env_logger = "0.11.5"
 pollster = "0.3.0"
 wgpu = "22.1.0"
-winit = "0.29"
-bytemuck = { version = "1.17.0", features = ["derive"] }
+winit = "0.30"
+bytemuck = { version = "1.18.0", features = ["derive"] }
 palette ={ version = "0.7.6", features = ["bytemuck"] }
 image = "0.25.2"
 guillotiere = "0.6.2"
