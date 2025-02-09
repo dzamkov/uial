@@ -112,8 +112,8 @@ pub struct ImmediateDrawPlacer<'a, F: Font<Drawer>, Drawer: RasterDrawer + ?Size
     target: &'a mut Drawer,
 }
 
-impl<'a, F: Font<Drawer>, Drawer: RasterDrawer + ?Sized> GlyphPlacer
-    for ImmediateDrawPlacer<'a, F, Drawer>
+impl<F: Font<Drawer>, Drawer: RasterDrawer + ?Sized> GlyphPlacer
+    for ImmediateDrawPlacer<'_, F, Drawer>
 {
     type Glyph = F::Glyph;
 

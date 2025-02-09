@@ -150,12 +150,11 @@ struct LabelInst<
 }
 
 impl<
-        'a,
         Env: WidgetEnvironment + Track + ?Sized,
         F: Property<Env>,
         T: Property<Env, Value = String>,
         Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for LabelInst<'a, Env, F, T, Slot>
+    > WidgetInst<Env> for LabelInst<'_, Env, F, T, Slot>
 where
     Env::Drawer: RasterDrawer,
     F::Value: Font<Env::Drawer>,

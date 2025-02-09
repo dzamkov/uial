@@ -87,7 +87,7 @@ impl ImageManager for WgpuImageAtlas {
         let mut allocator = self.allocator.lock().unwrap();
         if let Some(alloc) = allocator.allocate(size) {
             self.context.queue.write_texture(
-                wgpu::ImageCopyTexture {
+                wgpu::TexelCopyTextureInfo {
                     texture: &self.texture,
                     mip_level: 0,
                     origin: wgpu::Origin3d {
@@ -98,7 +98,7 @@ impl ImageManager for WgpuImageAtlas {
                     aspect: wgpu::TextureAspect::All,
                 },
                 source.to_rgba8().as_raw().as_slice(),
-                wgpu::ImageDataLayout {
+                wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(source.width() * 4),
                     rows_per_image: Some(source.height()),

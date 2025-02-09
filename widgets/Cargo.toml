@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 uial = { path = "../core" }
-image = "0.25.2"
+image = "0.25"
 
 [dev-dependencies]
 uial-backend = { path = "../backend" }

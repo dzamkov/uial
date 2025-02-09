@@ -60,7 +60,7 @@ impl<'brand> React for VersionReact<'brand> {
     }
 }
 
-impl<'brand> Track for VersionReact<'brand> {
+impl Track for VersionReact<'_> {
     type ValidityToken = Version;
 
     fn track<R>(&self, inner: impl FnOnce() -> R) -> (R, Version) {
@@ -180,7 +180,7 @@ impl Default for Aspect {
     }
 }
 
-impl Distribution<Aspect> for rand::distributions::Standard {
+impl Distribution<Aspect> for rand::distr::StandardUniform {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Aspect {
         Aspect((rng.next_u32() % 64) as u8)
     }
@@ -196,7 +196,7 @@ fn test_version() {
         // Observe a random set of aspects
         let mut validity = Version::MAX;
         let mut observed = 0u64;
-        for _ in 0..rng.gen_range(1..10) {
+        for _ in 0..rng.random_range(1..10) {
             let aspect = Aspect::new();
             observed |= 1 << aspect.0;
             validity.reduce_to_for(&version, aspect);
@@ -204,7 +204,7 @@ fn test_version() {
 
         // Update a random set of aspects
         let mut updated = 0u64;
-        for _ in 0..rng.gen_range(1..10) {
+        for _ in 0..rng.random_range(1..10) {
             let aspect = Aspect::new();
             updated |= 1 << aspect.0;
             version.incr(aspect);

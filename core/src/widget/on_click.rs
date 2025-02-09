@@ -52,13 +52,8 @@ struct OnClickInst<'a, F, S, T> {
     inner: T,
 }
 
-impl<
-        'a,
-        Env: WidgetEnvironment + ?Sized,
-        F: Fn(&mut Env),
-        S: WidgetSlot<Env>,
-        T: WidgetInst<Env>,
-    > WidgetInst<Env> for OnClickInst<'a, F, S, T>
+impl<Env: WidgetEnvironment + ?Sized, F: Fn(&mut Env), S: WidgetSlot<Env>, T: WidgetInst<Env>>
+    WidgetInst<Env> for OnClickInst<'_, F, S, T>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.inner.draw(env, drawer)

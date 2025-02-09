@@ -67,7 +67,7 @@ impl<'brand> React for RenegeReact<'brand> {
     }
 }
 
-impl<'brand> Track for RenegeReact<'brand> {
+impl Track for RenegeReact<'_> {
     type ValidityToken = renege::Token;
 
     fn track<R>(&self, inner: impl FnOnce() -> R) -> (R, renege::Token) {

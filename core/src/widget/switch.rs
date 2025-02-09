@@ -116,12 +116,11 @@ impl<
 }
 
 impl<
-        'a,
         P: Property<Env, Value = Rc<T>>,
         T: Widget<Env> + ?Sized,
         Env: WidgetEnvironment + ?Sized,
         Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for SwitchInst<'a, P, T, Env, Slot>
+    > WidgetInst<Env> for SwitchInst<'_, P, T, Env, Slot>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.inner(env).front.draw(env, drawer)

@@ -192,12 +192,11 @@ pub struct ZoomCanvasInst<
 }
 
 impl<
-        'a,
         Env: WidgetEnvironment + ?Sized,
         C: Field<Env, Value = Camera>,
         F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
         Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for ZoomCanvasInst<'a, Env, C, F, Slot>
+    > WidgetInst<Env> for ZoomCanvasInst<'_, Env, C, F, Slot>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         let mut proj = self.widget.camera.get(env).projection();

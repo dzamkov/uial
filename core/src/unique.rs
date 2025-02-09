@@ -14,10 +14,12 @@ static NEXT_BLOCK: AtomicU32 = AtomicU32::new(1);
 
 thread_local! {
     /// The previously-returned [`Unique`] for the current thread.
-    static PREV_UNIQUE: Cell<Unique> = Cell::new(Unique {
-        block: unsafe { NonZeroU32::new_unchecked(u32::MAX) },
-        item: u32::MAX
-    });
+    static PREV_UNIQUE: Cell<Unique> = const {
+        Cell::new(Unique {
+            block: unsafe { NonZeroU32::new_unchecked(u32::MAX) },
+            item: u32::MAX,
+        })
+    };
 }
 
 impl Unique {

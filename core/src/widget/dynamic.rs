@@ -107,7 +107,7 @@ impl<Env: WidgetEnvironment + ?Sized> WidgetSlot<Env> for Rc<dyn WidgetSlotSafe<
     }
 }
 
-impl<'a, Env: WidgetEnvironment + ?Sized> WidgetBase for DynWidget<'a, Env> {}
+impl<Env: WidgetEnvironment + ?Sized> WidgetBase for DynWidget<'_, Env> {}
 
 impl<'a, Env: WidgetEnvironment + ?Sized + 'a> Widget<Env> for DynWidget<'a, Env> {
     fn sizing(&self, env: &Env) -> Sizing {

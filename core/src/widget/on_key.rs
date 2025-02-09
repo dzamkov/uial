@@ -59,7 +59,7 @@ struct OnKeySlot<'a, F, S> {
     source: S,
 }
 
-impl<'a, F, S: Clone> Clone for OnKeySlot<'a, F, S> {
+impl<F, S: Clone> Clone for OnKeySlot<'_, F, S> {
     fn clone(&self) -> Self {
         OnKeySlot {
             handler: self.handler,
@@ -106,12 +106,11 @@ struct OnKeyInst<'a, F, S, T> {
 }
 
 impl<
-        'a,
         Env: WidgetEnvironment + ?Sized,
         F: Fn(&mut Env, Key) -> bool,
         S: WidgetSlot<Env>,
         T: WidgetInst<Env>,
-    > WidgetInst<Env> for OnKeyInst<'a, F, S, T>
+    > WidgetInst<Env> for OnKeyInst<'_, F, S, T>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.inner.draw(env, drawer)

@@ -148,8 +148,8 @@ struct StackLayout {
     split: u32,
 }
 
-impl<'a, Env: WidgetEnvironment + Track + ?Sized, S: WidgetSlot<Env>, const VERTICAL: bool>
-    StackShared<'a, Env, S, VERTICAL>
+impl<Env: WidgetEnvironment + Track + ?Sized, S: WidgetSlot<Env>, const VERTICAL: bool>
+    StackShared<'_, Env, S, VERTICAL>
 {
     /// Gets the current layout of the widget.
     pub fn layout(&self, env: &Env) -> StackLayout {
@@ -186,12 +186,11 @@ struct StackSlot<
 >(Rc<StackShared<'a, Env, S, VERTICAL>>);
 
 impl<
-        'a,
         Env: WidgetEnvironment + Track + ?Sized,
         S: WidgetSlot<Env>,
         const VERTICAL: bool,
         const SIDE: bool,
-    > Clone for StackSlot<'a, Env, S, VERTICAL, SIDE>
+    > Clone for StackSlot<'_, Env, S, VERTICAL, SIDE>
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -199,12 +198,11 @@ impl<
 }
 
 impl<
-        'a,
         Env: WidgetEnvironment + Track + ?Sized,
         S: WidgetSlot<Env>,
         const VERTICAL: bool,
         const SIDE: bool,
-    > WidgetSlot<Env> for StackSlot<'a, Env, S, VERTICAL, SIDE>
+    > WidgetSlot<Env> for StackSlot<'_, Env, S, VERTICAL, SIDE>
 {
     fn is_visible(&self, env: &Env) -> bool {
         self.0.slot.is_visible(env)

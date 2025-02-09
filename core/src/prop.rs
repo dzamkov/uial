@@ -300,11 +300,11 @@ impl<Env: ?Sized, T: ?Sized, P: Property<Env, Value = T>> PropertySafe<Env, T> f
     }
 }
 
-impl<'a, Env: ?Sized, T: ?Sized> PropertyBase for DynProperty<'a, Env, T> {
+impl<Env: ?Sized, T: ?Sized> PropertyBase for DynProperty<'_, Env, T> {
     type Value = T;
 }
 
-impl<'a, Env: ?Sized, T: ?Sized> Property<Env> for DynProperty<'a, Env, T> {
+impl<Env: ?Sized, T: ?Sized> Property<Env> for DynProperty<'_, Env, T> {
     fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Self::Value) -> R) -> R {
         let mut inner = Some(inner);
         let mut res = None;
@@ -345,7 +345,7 @@ impl<'a, Env: ?Sized, T> From<Rc<DynProperty<'a, Env, T>>> for ConstOrRcDynPrope
     }
 }
 
-impl<'a, Env: ?Sized, T: Clone> Clone for ConstOrRcDynProperty<'a, Env, T> {
+impl<Env: ?Sized, T: Clone> Clone for ConstOrRcDynProperty<'_, Env, T> {
     fn clone(&self) -> Self {
         match self {
             Self::Const(value) => Self::Const(value.clone()),
@@ -354,11 +354,11 @@ impl<'a, Env: ?Sized, T: Clone> Clone for ConstOrRcDynProperty<'a, Env, T> {
     }
 }
 
-impl<'a, Env: ?Sized, T> PropertyBase for ConstOrRcDynProperty<'a, Env, T> {
+impl<Env: ?Sized, T> PropertyBase for ConstOrRcDynProperty<'_, Env, T> {
     type Value = T;
 }
 
-impl<'a, Env: ?Sized, T> Property<Env> for ConstOrRcDynProperty<'a, Env, T> {
+impl<Env: ?Sized, T> Property<Env> for ConstOrRcDynProperty<'_, Env, T> {
     fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Self::Value) -> R) -> R {
         match self {
             Self::Const(value) => inner(value),

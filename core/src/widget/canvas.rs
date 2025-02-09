@@ -49,11 +49,10 @@ struct CanvasInst<'a, Env: WidgetEnvironment + ?Sized, F, Slot> {
 }
 
 impl<
-        'a,
         Env: WidgetEnvironment + ?Sized,
         F: Fn(&Env, Size2i, &mut Env::Drawer),
         Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for CanvasInst<'a, Env, F, Slot>
+    > WidgetInst<Env> for CanvasInst<'_, Env, F, Slot>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         // TODO: Translate the drawer to the slot's minimum corner

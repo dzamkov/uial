@@ -109,7 +109,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
         let (surface, drawer_context) = if let Some(wgpu) = &self.wgpu {
             todo!()
         } else {
-            let inst = wgpu::Instance::new(Default::default());
+            let inst = wgpu::Instance::new(&Default::default());
             let surface = inst.create_surface(window).unwrap();
             self.wgpu = Some(pollster::block_on(async {
                 let adapter = inst
