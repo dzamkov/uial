@@ -138,8 +138,8 @@ struct ButtonInst<'a, Env: WidgetEnvironment + HasImageManager + ?Sized, Slot> {
     slot: Slot,
 }
 
-impl<'a, Env: WidgetEnvironment + HasImageManager + ?Sized, Slot: WidgetSlot<Env>> WidgetInst<Env>
-    for ButtonInst<'a, Env, Slot>
+impl<Env: WidgetEnvironment + HasImageManager + ?Sized, Slot: WidgetSlot<Env>> WidgetInst<Env>
+    for ButtonInst<'_, Env, Slot>
 where
     Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,
 {

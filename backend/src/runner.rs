@@ -474,6 +474,16 @@ struct RawRunEnv<State, Runner> {
 }
 
 impl<S: HasReact + Track> RunEnv<S> {
+    /// Executes a closure with a [`RunEnv`] constructed from the given state and runner.
+    pub fn with_ref<R>(state: &S, runner: &Runner<S>, inner: impl FnOnce(&Self) -> R) -> R {
+        inner(Self::from_raw_ref(&RawRunEnv { state, runner }))
+    }
+
+    /// Executes a closure with a mutable [`RunEnv`] constructed from the given state and runner.
+    pub fn with_mut<R>(state: &mut S, runner: &Runner<S>, inner: impl FnOnce(&mut Self) -> R) -> R {
+        inner(Self::from_raw_mut(&mut RawRunEnv { state, runner }))
+    }
+
     /// Converts a [`RawRunEnv`] reference into a [`RunEnv`] reference.
     fn from_raw_ref<'a>(raw: &'a RawRunEnv<&S, &Runner<S>>) -> &'a Self {
         unsafe { &*(core::ptr::slice_from_raw_parts(raw, 0) as *const RunEnv<S>) }

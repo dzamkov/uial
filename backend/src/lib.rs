@@ -12,53 +12,98 @@ pub type DefaultState = (DefaultReact, Clock);
 /// The default environment type for a simple application.
 pub type DefaultEnv = RunEnv<DefaultState>;
 
-/// Runs an application consisting of a single window. Returns when the window is closed (if
-/// the platform supports it).
-pub fn run<'a>(title: &str, body: &dyn Fn(&DefaultEnv) -> Rc<DynWidget<'a, DefaultEnv>>) {
+/// Initializes and runs a [`SimpleApplication`].
+pub fn run<App: SimpleApplication<DefaultEnv>>(init: impl FnOnce(&mut DefaultState) -> App) {
     let mut state = (
         unsafe { DefaultReact::new_static() },
         Clock::new(Duration::ZERO),
     );
+    let app = init(&mut state);
     let runner = Runner::new(&mut state);
-    let mut app = DefaultApp {
+    let mut handler = SimpleAppHandler {
         start_inst: std::time::Instant::now(),
         state,
         runner,
-        title,
-        body,
+        app: &app,
     };
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
-    event_loop.run_app(&mut app).unwrap();
+    event_loop.run_app(&mut handler).unwrap();
 }
 
-/// The [`winit::application::ApplicationHandler`] for a simple application.
-struct DefaultApp<'a, 'b> {
-    start_inst: std::time::Instant,
-    state: DefaultState,
-    runner: Runner<'b, DefaultState>,
-    title: &'a str,
-    body: &'a dyn Fn(&DefaultEnv) -> Rc<DynWidget<'b, DefaultEnv>>,
-}
+/// An application consisting of a single window.
+pub trait SimpleApplication<Env: ?Sized + WidgetEnvironment> {
+    /// Gets the title for the application window.
+    fn title(&self, env: &Env) -> &str;
 
-impl DefaultApp<'_, '_> {
-    /// Ensures `state` is up-to-date.
-    fn update_state(&mut self) {
-        self.state
-            .1
-            .set(self.start_inst.elapsed().try_into().unwrap());
+    /// Gets the [`Widget`] which is displayed in the body of the application window.
+    fn body(&self, env: &Env) -> Rc<DynWidget<'_, Env>>;
+
+    /// Updates the application in response to the passage of time.
+    fn update(&self, env: &mut Env, delta_time: Duration) {
+        // Nothing done by default
+        let _ = (env, delta_time);
     }
 }
 
-impl winit::application::ApplicationHandler for DefaultApp<'_, '_> {
+/// An implementation of [`SimpleApplication`] using dynamic dispatch.
+pub struct SimpleApp<'a> {
+    /// The title of the application window.
+    pub title: &'a str,
+
+    /// The body of the application window.
+    pub body: &'a dyn Fn(&DefaultEnv) -> Rc<DynWidget<'a, DefaultEnv>>,
+}
+
+impl SimpleApplication<DefaultEnv> for SimpleApp<'_> {
+    fn title(&self, _: &DefaultEnv) -> &str {
+        self.title
+    }
+
+    fn body(&self, env: &DefaultEnv) -> Rc<DynWidget<'_, DefaultEnv>> {
+        (self.body)(env)
+    }
+}
+
+/// The [`winit::application::ApplicationHandler`] for a [`SimpleApplication`].
+struct SimpleAppHandler<'app, App> {
+    start_inst: std::time::Instant,
+    state: DefaultState,
+    runner: Runner<'app, DefaultState>,
+    app: &'app App,
+}
+
+impl<App: SimpleApplication<DefaultEnv>> SimpleAppHandler<'_, App> {
+    /// Ensures `state` is up-to-date.
+    fn update_state(&mut self) {
+        let n_time = self.start_inst.elapsed().try_into().unwrap();
+        let delta_time = n_time - self.state.1.get();
+
+        // Update clock
+        self.state.1.set(n_time);
+
+        // Update application
+        DefaultEnv::with_mut(&mut self.state, &self.runner, |env| {
+            self.app.update(env, delta_time)
+        })
+    }
+}
+
+impl<App: SimpleApplication<DefaultEnv>> winit::application::ApplicationHandler
+    for SimpleAppHandler<'_, App>
+{
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         if self.runner.windows().next().is_none() {
             self.update_state();
+            // TODO: Update title dynamically
+            let title = DefaultEnv::with_ref(&self.state, &self.runner, |env| {
+                self.app.title(env).to_owned()
+            });
             self.runner
                 .create_window(
                     &mut self.state,
                     event_loop,
-                    winit::window::WindowAttributes::default().with_title(self.title.to_owned()),
-                    self.body,
+                    winit::window::WindowAttributes::default().with_title(title),
+                    &|env| self.app.body(env),
                     Box::new(|_, l| l.exit()),
                 )
                 .unwrap();

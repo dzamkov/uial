@@ -21,12 +21,12 @@ impl WgpuErasedDrawer {
 
     /// Calls a function with the unerased form of this [`WgpuErasedDrawer`].
     pub fn with_unerase_ref<'a, R>(&'a self, f: impl FnOnce(&'a WgpuDrawer) -> R) -> R {
-        f(unsafe { std::mem::transmute(self) })
+        f(unsafe { std::mem::transmute::<&'a Self, &'a WgpuDrawer>(self) })
     }
 
     /// Calls a function with the unerased form of this [`WgpuErasedDrawer`].
     pub fn with_unerase_mut<'a, R>(&'a mut self, f: impl FnOnce(&'a mut WgpuDrawer) -> R) -> R {
-        f(unsafe { std::mem::transmute(self) })
+        f(unsafe { std::mem::transmute::<&'a mut Self, &'a mut WgpuDrawer>(self) })
     }
 }
 
