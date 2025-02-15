@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-uial-geometry = { path = "../geometry" }
+diffgeom = { git = "https://github.com/dzamkov/diffgeom", features = ["bytemuck"] }
 renege = "0.1"
 derive_more = { version = "1", features = ["full"] }
 winit = "0.30"

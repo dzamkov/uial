@@ -272,7 +272,7 @@ impl<M: ImageManager, Family: Borrow<ImageTTFontFamily<M>>> FontBase for ImageTT
             let glyph_id = face.source.glyph_index(ch).expect("Missing glyph");
             let glyph_info = &face.glyphs[glyph_id.0 as usize];
             match writer.dir {
-                Dir2i::PosX => {
+                Dir2i::Xp => {
                     // Place glyph if it is visible
                     if glyph_info.render_info.is_some() {
                         let (offset_x, sub_pixel_x) = quantize_pixel_offset(writer.pen.x);

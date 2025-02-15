@@ -37,7 +37,7 @@ where
     pub fn new(font: F, text: T) -> Self {
         Label {
             font,
-            dir: Dir2i::PosX,
+            dir: Dir2i::Xp,
             text,
             text_buffer_cache: Cache::new(),
         }
@@ -93,7 +93,7 @@ where
 {
     Label {
         font: const_(font),
-        dir: Dir2i::PosX,
+        dir: Dir2i::Xp,
         text,
         text_buffer_cache: Cache::new(),
     }

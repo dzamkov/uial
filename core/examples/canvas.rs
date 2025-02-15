@@ -13,7 +13,7 @@ fn main() {
         let num_clicks = Rc::new(env.react().new_cell(0));
         let num_clicks_clone = num_clicks.clone();
         widget::canvas(move |env: &RunEnv<_>, size, d| {
-            let center = vec2i(size.x as i32 / 2, size.y as i32 / 2);
+            let center = vec2i(size.x() as i32 / 2, size.y() as i32 / 2);
             d.fill_rect(
                 srgba(1.0, 0.2, 0.2, 0.4),
                 Box2i::from_min_size(center, size2i(300, 200)),
@@ -28,12 +28,12 @@ fn main() {
             );
             d.draw_circle(
                 srgba(0.0, 1.0, 0.0, 1.0),
-                size.into_vec().into_float() / 2.0,
+                size.to_vec().to_float() / 2.0,
                 50.0,
             );
             d.draw_circle(
                 srgba(0.0, 1.0, 0.0, 1.0),
-                size.into_vec().into_float() / 2.0,
+                size.to_vec().to_float() / 2.0,
                 100.0,
             );
             d.draw_image(

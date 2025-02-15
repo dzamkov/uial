@@ -1,6 +1,5 @@
-use uial_geometry::Rotation2;
-
 use super::*;
+use crate::geometry::Rotation2;
 
 /// An interface for constructing a polyline or a polygon by incrementally adding points which
 /// are connected to the previous point.

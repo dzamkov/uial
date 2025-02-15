@@ -2,11 +2,11 @@ mod polyline;
 mod text;
 
 use super::*;
+use crate::geometry::{Ortho2i, Similarity2};
 pub use polyline::*;
 use std::rc::Rc;
 use std::sync::Arc;
 pub use text::*;
-use uial_geometry::{Ortho2i, Similarity2};
 
 /// The typical color type for use with drawing functions.
 pub type Color = palette::LinSrgb<f32>;
@@ -28,7 +28,7 @@ pub fn srgba(r: f32, g: f32, b: f32, a: f32) -> Paint {
 pub trait VectorDrawer {
     /// Gets a [`Box2`] which covers all space that is "visible" (i.e. not ignored by the drawer).
     fn visible_bounds(&self) -> Box2 {
-        Box2::all()
+        Box2::ALL
     }
 
     /// Begins drawing a poly-arc.
@@ -271,7 +271,8 @@ impl<T: VectorDrawer + ?Sized> VectorDrawer for &mut T {
         (**self).draw_polyarc(paint, start)
     }
 
-    type PolyarcDrawer<'a> = T::PolyarcDrawer<'a>
+    type PolyarcDrawer<'a>
+        = T::PolyarcDrawer<'a>
     where
         Self: 'a;
 
@@ -279,7 +280,8 @@ impl<T: VectorDrawer + ?Sized> VectorDrawer for &mut T {
         (**self).fill_polyarc(paint, start)
     }
 
-    type PolyarcFiller<'a> = T::PolyarcFiller<'a>
+    type PolyarcFiller<'a>
+        = T::PolyarcFiller<'a>
     where
         Self: 'a;
 }
@@ -288,12 +290,17 @@ impl<T: VectorDrawer> VectorDrawer for Transform<Similarity2, T> {
     fn visible_bounds(&self) -> Box2 {
         let inv_trans = self.transform.inverse();
         let source_bounds = self.source.visible_bounds();
-        Box2::bound_points([
-            inv_trans * vec2(source_bounds.min.x, source_bounds.min.y),
-            inv_trans * vec2(source_bounds.max.x, source_bounds.min.y),
-            inv_trans * vec2(source_bounds.min.x, source_bounds.max.y),
-            inv_trans * vec2(source_bounds.max.x, source_bounds.max.y),
-        ])
+        Box2::bound_many(
+            [
+                inv_trans * vec2(source_bounds.min().x, source_bounds.min().y),
+                inv_trans * vec2(source_bounds.max().x, source_bounds.min().y),
+                inv_trans * vec2(source_bounds.min().x, source_bounds.max().y),
+                inv_trans * vec2(source_bounds.max().x, source_bounds.max().y),
+            ]
+            .into_iter()
+            .map(Box2::only),
+        )
+        .unwrap()
     }
 
     fn draw_polyarc(&mut self, paint: Paint, start: Vector2) -> Self::PolyarcDrawer<'_> {
@@ -301,7 +308,8 @@ impl<T: VectorDrawer> VectorDrawer for Transform<Similarity2, T> {
         Transform::new(self.source.draw_polyarc(paint, start), self.transform)
     }
 
-    type PolyarcDrawer<'a> = Transform<Similarity2, T::PolyarcDrawer<'a>>
+    type PolyarcDrawer<'a>
+        = Transform<Similarity2, T::PolyarcDrawer<'a>>
     where
         Self: 'a;
 
@@ -310,7 +318,8 @@ impl<T: VectorDrawer> VectorDrawer for Transform<Similarity2, T> {
         Transform::new(self.source.fill_polyarc(paint, start), self.transform)
     }
 
-    type PolyarcFiller<'a> = Transform<Similarity2, T::PolyarcFiller<'a>>
+    type PolyarcFiller<'a>
+        = Transform<Similarity2, T::PolyarcFiller<'a>>
     where
         Self: 'a;
 }

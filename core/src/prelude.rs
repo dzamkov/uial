@@ -13,10 +13,7 @@ pub use crate::{stack_h, stack_v, overlay};
 
 pub use crate::react::{DefaultReact, HasReact, React, ReactCell};
 
-pub use uial_geometry::{size2i, vec2i, Box2i, Ortho2i, Padding2i, Point2i, Size2i, Vector2i};
-pub use uial_geometry::{vec2, Box2, Scalar, Vector2, PI};
-pub use uial_geometry::{Duration, Instant};
-
+pub use crate::geometry::*;
 pub use crate::cache::*;
 pub use crate::input::*;
 pub use crate::prop::*;

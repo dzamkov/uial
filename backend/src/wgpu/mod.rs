@@ -109,7 +109,7 @@ impl WgpuDrawerContext {
                 vertex: wgpu::VertexState {
                     module: &shader,
                     entry_point: Some("vs_main"),
-                    compilation_options: wgpu::PipelineCompilationOptions::default(), 
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[DrawVertex::LAYOUT],
                 },
                 primitive: wgpu::PrimitiveState {
@@ -129,7 +129,7 @@ impl WgpuDrawerContext {
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: Some("fs_main"),
-                    compilation_options: wgpu::PipelineCompilationOptions::default(), 
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: draw_format,
                         blend: Some(wgpu::BlendState {
@@ -148,7 +148,7 @@ impl WgpuDrawerContext {
                     })],
                 }),
                 multiview: None,
-                cache: None
+                cache: None,
             })
         };
         let line_pipeline = create_pipeline(wgpu::PrimitiveTopology::LineList);
@@ -229,7 +229,7 @@ impl WgpuDrawerContext {
     ) {
         // Get central UV for solid white image
         let white_image = self.white_image.to_source();
-        let white_uv = (white_image.rect().min.into_float() + vec2(0.5, 0.5))
+        let white_uv = (white_image.rect().min().to_float() + vec2(0.5, 0.5))
             / white_image.source().texture_size as Scalar;
 
         // Begin render pass
@@ -371,8 +371,8 @@ impl WgpuDrawerResources {
         let context = &*drawer_context.context;
 
         // Create uniforms buffer
-        let scale_x = 2.0 / (size.x as f32);
-        let scale_y = 2.0 / (size.y as f32);
+        let scale_x = 2.0 / (size.x() as f32);
+        let scale_y = 2.0 / (size.y() as f32);
         let uniforms = WgpuDrawerUniforms {
             proj_view: [
                 [scale_x, 0.0, 0.0, 0.0],
@@ -408,8 +408,8 @@ impl WgpuDrawerResources {
         let depth_stencil_texture = context.device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size: wgpu::Extent3d {
-                width: size.x,
-                height: size.y,
+                width: size.x(),
+                height: size.y(),
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -540,10 +540,13 @@ impl<'pass> WgpuDrawer<'pass> {
 
 impl VectorDrawer for WgpuDrawer<'_> {
     fn visible_bounds(&self) -> Box2 {
-        Box2 {
-            min: vec2(0.0, 0.0),
-            max: vec2(self.output_size.x as Scalar, self.output_size.y as Scalar),
-        }
+        Box2::from_min_max(
+            vec2(0.0, 0.0),
+            vec2(
+                self.output_size.x() as Scalar,
+                self.output_size.y() as Scalar,
+            ),
+        )
     }
 
     fn draw_polyarc(&mut self, paint: Paint, start: Vector2) -> Self::PolyarcDrawer<'_> {
@@ -567,7 +570,8 @@ impl VectorDrawer for WgpuDrawer<'_> {
         ArcTessellator::new(drawer, 0.5)
     }
 
-    type PolyarcDrawer<'a> = ArcTessellator<WgpuPolylineDrawer<'a>>
+    type PolyarcDrawer<'a>
+        = ArcTessellator<WgpuPolylineDrawer<'a>>
     where
         Self: 'a;
 
@@ -589,7 +593,8 @@ impl VectorDrawer for WgpuDrawer<'_> {
         ArcTessellator::new(filler, 0.5)
     }
 
-    type PolyarcFiller<'a> = ArcTessellator<WgpuPolylineFiller<'a>>
+    type PolyarcFiller<'a>
+        = ArcTessellator<WgpuPolylineFiller<'a>>
     where
         Self: 'a;
 }
@@ -603,25 +608,25 @@ impl RasterDrawer for WgpuDrawer<'_> {
         let (verts, tris) = self.verts_tris_mut(paint.alpha == 255);
         let base_index = verts.len() as u32;
         verts.push(DrawVertex {
-            pos: vec2i(rect.min.x, rect.min.y).into_float(),
+            pos: vec2i(rect.min().x, rect.min().y).to_float(),
             layer,
             uv: white_uv,
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(rect.max_exclusive.x, rect.min.y).into_float(),
+            pos: vec2i(rect.max().x + 1, rect.min().y).to_float(),
             layer,
             uv: white_uv,
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(rect.min.x, rect.max_exclusive.y).into_float(),
+            pos: vec2i(rect.min().x, rect.max().y + 1).to_float(),
             layer,
             uv: white_uv,
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(rect.max_exclusive.x, rect.max_exclusive.y).into_float(),
+            pos: vec2i(rect.max().x + 1, rect.max().y + 1).to_float(),
             layer,
             uv: white_uv,
             paint,
@@ -637,41 +642,36 @@ impl RasterDrawer for WgpuDrawer<'_> {
 
 impl ImageDrawer<WgpuImageAtlas> for WgpuDrawer<'_> {
     #[allow(clippy::identity_op)]
-    fn draw_image(
-        &mut self,
-        image: Image<&WgpuImageAtlas>,
-        paint: Paint,
-        trans: Ortho2i,
-    ) {
+    fn draw_image(&mut self, image: Image<&WgpuImageAtlas>, paint: Paint, trans: Ortho2i) {
         let layer = self.next_layer();
         let paint: palette::Srgba<u8> = paint.into();
         let (verts, tris) = self.verts_tris_mut(false); // TODO: Handle opaque images
         let base_index = verts.len() as u32;
         let pos_min = trans * vec2i(0, 0);
-        let pos_max = trans * image.rect().size().into_vec();
+        let pos_max = trans * image.rect().size().to_vec();
         let uv_scale = 1.0 / image.source().texture_size as Scalar;
-        let uv_min = image.rect().min.into_float() * uv_scale;
-        let uv_max = uv_min + image.rect().size().into_vec().into_float() * uv_scale;
+        let uv_min = image.rect().min().to_float() * uv_scale;
+        let uv_max = uv_min + image.rect().size().to_vec().to_float() * uv_scale;
         verts.push(DrawVertex {
-            pos: vec2i(pos_min.x, pos_max.y).into_float(),
+            pos: vec2i(pos_min.x, pos_max.y).to_float(),
             layer,
             uv: vec2(uv_min.x, uv_min.y),
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(pos_max.x, pos_max.y).into_float(),
+            pos: vec2i(pos_max.x, pos_max.y).to_float(),
             layer,
             uv: vec2(uv_max.x, uv_min.y),
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(pos_min.x, pos_min.y).into_float(),
+            pos: vec2i(pos_min.x, pos_min.y).to_float(),
             layer,
             uv: vec2(uv_min.x, uv_max.y),
             paint,
         });
         verts.push(DrawVertex {
-            pos: vec2i(pos_max.x, pos_min.y).into_float(),
+            pos: vec2i(pos_max.x, pos_min.y).to_float(),
             layer,
             uv: vec2(uv_max.x, uv_max.y),
             paint,

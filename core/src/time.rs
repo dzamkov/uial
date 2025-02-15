@@ -1,6 +1,6 @@
 use super::*;
+pub use crate::geometry::{Duration, Instant};
 use std::cell::Cell;
-pub use uial_geometry::time::{Duration, Instant};
 
 /// An "environment" which provides an absolute time reference.
 pub trait HasClock {

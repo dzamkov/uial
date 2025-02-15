@@ -110,7 +110,7 @@ where
     Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,
 {
     fn sizing(&self, _: &Env) -> Sizing {
-        let mut min = size2i(0, 0);
+        let mut min = size2i(1, 1);
         for s in &[
             &self.style.normal,
             &self.style.hover,
@@ -118,10 +118,10 @@ where
             &self.style.disabled,
         ] {
             let s_min = s.min_size();
-            min.x = min.x.max(s_min.x);
-            min.y = min.y.max(s_min.y);
+            min.x_minus_1 = min.x_minus_1.max(s_min.x_minus_1);
+            min.y_minus_1 = min.y_minus_1.max(s_min.y_minus_1);
         }
-        Sizing::range(min, size2i(u32::MAX, u32::MAX))
+        Sizing::minimum(min)
     }
 
     fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
@@ -155,7 +155,7 @@ where
             bounds.size(),
             drawer,
             srgba(1.0, 1.0, 1.0, 1.0),
-            Ortho2i::translate(bounds.min),
+            Ortho2i::translate(bounds.min()),
         )
     }
 
@@ -165,7 +165,7 @@ where
         pos: Vector2i,
         f: &mut dyn FnMut(&dyn std::any::Any),
     ) -> bool {
-        if self.slot.bounds(env).contains_exclusive(pos) {
+        if self.slot.bounds(env).contains(pos) {
             f(&HoverFeedback(self.widget.id));
             true
         } else {
@@ -186,7 +186,7 @@ where
         {
             if self.widget.is_enabled.get(env) {
                 let bounds = self.slot.bounds(env);
-                if bounds.contains_exclusive(pos) {
+                if bounds.contains(pos) {
                     return CursorEventResponse::Start(CursorInteractionRequest {
                         scope: FocusScope::NONE,
                         handler: Rc::new(self),
@@ -222,7 +222,7 @@ impl<'a, Env: WidgetEnvironment + HasImageManager + ?Sized, Slot: WidgetSlot<Env
         } = event
         {
             let bounds = self.slot.bounds(env);
-            if bounds.contains_exclusive(pos) {
+            if bounds.contains(pos) {
                 (self.widget.on_click)(env);
             }
             CursorInteractionEventResponse::End

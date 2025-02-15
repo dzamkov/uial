@@ -134,22 +134,22 @@ impl<
             let align = self.widget.align;
             let size = self.source.size(env);
             if VERTICAL {
-                let inner_size_y = inner_sizing.upto_y(size.x, size.y);
+                let inner_size_y = inner_sizing.upto_y(size.x(), size.y());
                 let inner_size_y = inner_size_y.expect("invalid size");
-                let padding = size.y - inner_size_y;
+                let padding = size.y() - inner_size_y;
                 let before_padding = mul_rational(align, padding);
                 ExtendLayout {
                     before_padding,
-                    inner_size: size2i(size.x, inner_size_y),
+                    inner_size: size2i(size.x(), inner_size_y),
                 }
             } else {
-                let inner_size_x = inner_sizing.upto_x(size.x, size.y);
+                let inner_size_x = inner_sizing.upto_x(size.x(), size.y());
                 let inner_size_x = inner_size_x.expect("invalid size");
-                let padding = size.x - inner_size_x;
+                let padding = size.x() - inner_size_x;
                 let before_padding = mul_rational(align, padding);
                 ExtendLayout {
                     before_padding,
-                    inner_size: size2i(inner_size_x, size.y),
+                    inner_size: size2i(inner_size_x, size.y()),
                 }
             }
         })

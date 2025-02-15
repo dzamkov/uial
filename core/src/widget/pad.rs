@@ -28,7 +28,10 @@ impl<T: WidgetBase> WidgetBase for Pad<T> {}
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>> Widget<Env> for Pad<T> {
     fn sizing(&self, env: &Env) -> Sizing {
         let mut res = self.inner.sizing(env);
-        res += self.amount.size();
+        res.add_assign(
+            self.amount.n_x + self.amount.p_x,
+            self.amount.n_y + self.amount.p_y,
+        );
         res
     }
 
@@ -59,7 +62,10 @@ impl<Env: WidgetEnvironment + ?Sized, S: WidgetSlot<Env>> WidgetSlot<Env> for Pa
     }
 
     fn size(&self, env: &Env) -> Size2i {
-        self.source.size(env) - self.padding.size()
+        let mut res = self.source.size(env);
+        res.x_minus_1 -= self.padding.n_x + self.padding.p_x;
+        res.y_minus_1 -= self.padding.n_y + self.padding.p_y;
+        res
     }
 
     fn min(&self, env: &Env) -> Point2i {

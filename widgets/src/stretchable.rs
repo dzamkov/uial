@@ -42,7 +42,8 @@ pub struct BandPattern {
     bands_y: Vec<Band>,
     total_weight_x: NonZeroU32,
     total_weight_y: NonZeroU32,
-    min_size: Size2i,
+    min_size_x: u32,
+    min_size_y: u32,
 }
 
 impl BandPattern {
@@ -67,35 +68,33 @@ impl BandPattern {
             .sum();
         let total_weight_x = NonZeroU32::new(total_weight_x)?;
         let total_weight_y = NonZeroU32::new(total_weight_y)?;
-        let min_size = size2i(
-            bands_x
-                .iter()
-                .map(|b| match b.mode {
-                    BandMode::Fixed => b.size.get(),
-                    BandMode::Tiling { .. } => 0,
-                })
-                .sum(),
-            bands_y
-                .iter()
-                .map(|b| match b.mode {
-                    BandMode::Fixed => b.size.get(),
-                    BandMode::Tiling { .. } => 0,
-                })
-                .sum(),
-        );
+        let min_size_x = bands_x
+            .iter()
+            .map(|b| match b.mode {
+                BandMode::Fixed => b.size.get(),
+                BandMode::Tiling { .. } => 0,
+            })
+            .sum();
+        let min_size_y = bands_y
+            .iter()
+            .map(|b| match b.mode {
+                BandMode::Fixed => b.size.get(),
+                BandMode::Tiling { .. } => 0,
+            })
+            .sum();
         Some(Self {
             bands_x,
             bands_y,
             total_weight_x,
             total_weight_y,
-            min_size,
+            min_size_x,
+            min_size_y,
         })
     }
 
-    
     /// Gets the minimum size this pattern can be stretched to.
     pub fn min_size(&self) -> Size2i {
-        self.min_size
+        size2i(self.min_size_x.max(1), self.min_size_y.max(1))
     }
 
     /// Gets the size of the source image this pattern can be used with.
@@ -107,7 +106,7 @@ impl BandPattern {
 }
 
 impl<H: ImageHandle> StretchableImage<H> {
-    /// Constructs a new [`Stretchable`] from the given source image and [`BandPattern`].
+    /// Constructs a new [`StretchableImage`] from the given source image and [`BandPattern`].
     ///
     /// Returns [`None`] if the size of the source image does not match the size of the pattern.
     pub fn new(source: Image<H>, pattern: BandPattern) -> Option<Self> {
@@ -131,38 +130,29 @@ impl<H: ImageHandle> StretchableImage<H> {
         trans: Ortho2i,
     ) {
         let source = self.source.to_source();
-        let excess_size = size - self.min_size();
-        for band_y in draw_bands(
-            &self.pattern.bands_y,
-            self.pattern.total_weight_y,
-            excess_size.y,
-        ) {
-            for band_x in draw_bands(
-                &self.pattern.bands_x,
-                self.pattern.total_weight_x,
-                excess_size.x,
-            ) {
+        let excess_x = size.x() - self.pattern.min_size_x;
+        let excess_y = size.y() - self.pattern.min_size_y;
+        for band_y in draw_bands(&self.pattern.bands_y, self.pattern.total_weight_y, excess_y) {
+            for band_x in draw_bands(&self.pattern.bands_x, self.pattern.total_weight_x, excess_x) {
                 let cell_source = source
                     .view(Box2i::from_min_size(
                         vec2i(band_x.source_offset as i32, band_y.source_offset as i32),
                         size2i(band_x.source_size, band_y.source_size),
                     ))
                     .unwrap();
-                let cell_trans = Ortho2i::translate(vec2i(
-                    band_x.target_offset as i32,
-                    band_y.target_offset as i32,
-                )) * Ortho2i::scale(vec2i(
-                    band_x.target_scale as i32,
-                    band_y.target_scale as i32,
-                ));
+                let cell_trans =
+                    Ortho2i::translate(vec2i(
+                        band_x.target_offset as i32,
+                        band_y.target_offset as i32,
+                    )) * Ortho2i::scale(band_x.target_scale as i32, band_y.target_scale as i32);
                 drawer.draw_image(cell_source, paint, trans * cell_trans);
             }
         }
     }
 }
 
-/// Gets the [`DrawBand`]s along one axis required to draw a [`Stretchable`] that is stretched by
-/// the given size.
+/// Gets the [`DrawBand`]s along one axis required to draw a [`StretchableImage`] that is stretched
+/// by the given size.
 fn draw_bands(
     bands: &[Band],
     total_weight: NonZeroU32,

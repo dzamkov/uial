@@ -2,7 +2,6 @@ use crate::drawer::Transform;
 use crate::prelude::*;
 use std::any::Any;
 use std::marker::PhantomData;
-use uial_geometry::Similarity2;
 use winit::event::MouseScrollDelta;
 
 /// Encapsulates the state information for the "camera" of a [`ZoomCanvas`] which determines the
@@ -202,7 +201,7 @@ impl<
         let mut proj = self.widget.camera.get(env).projection();
         let bounds = self.slot.bounds(env);
         proj = Similarity2::translate(
-            bounds.min.into_float() + bounds.size().into_vec().into_float() / 2.0,
+            bounds.min().to_float() + bounds.size().to_vec().to_float() / 2.0,
         ) * proj;
         (self.widget.draw)(env, &mut Transform::new(drawer, proj))
     }
@@ -226,8 +225,7 @@ impl<
                 let bounds = self.slot.bounds(env);
                 self.widget.camera.with_mut(env, |camera| {
                     let point = camera.unproj(
-                        (pos - bounds.min).into_float()
-                            - bounds.size().into_vec().into_float() / 2.0,
+                        (pos - bounds.min()).to_float() - bounds.size().to_vec().to_float() / 2.0,
                     );
                     camera.zoom(point, ln_scale);
                 });

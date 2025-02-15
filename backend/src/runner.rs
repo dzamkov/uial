@@ -101,7 +101,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
         let window = event_loop.create_window(attrs)?;
         let inner = Rc::new(RunnerWindowInner {
             source: window,
-            size: state.react().new_cell(size2i(0, 0)),
+            size: state.react().new_cell(size2i(1, 1)),
         });
         let window = &inner.source;
 
@@ -152,12 +152,12 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
         let size = window.inner_size();
         let mut size = size2i(size.width, size.height);
         if let Some((min, max)) = sizing.as_range() {
-            size.x = u32::clamp(size.x, min.x, max.x);
-            size.y = u32::clamp(size.y, min.y, max.y);
-            let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(size.x, size.y));
-            window.set_min_inner_size(Some(winit::dpi::PhysicalSize::new(min.x, min.y)));
-            window.set_max_inner_size(if max.x < u32::MAX && max.y < u32::MAX {
-                Some(winit::dpi::PhysicalSize::new(max.x, max.y))
+            size.x_minus_1 = u32::clamp(size.x_minus_1, min.x_minus_1, max.x_minus_1);
+            size.y_minus_1 = u32::clamp(size.y_minus_1, min.y_minus_1, max.y_minus_1);
+            let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(size.x(), size.y()));
+            window.set_min_inner_size(Some(winit::dpi::PhysicalSize::new(min.x(), min.y())));
+            window.set_max_inner_size(if max.x_minus_1 < u32::MAX && max.y_minus_1 < u32::MAX {
+                Some(winit::dpi::PhysicalSize::new(max.x(), max.y()))
             } else {
                 None
             });
@@ -177,8 +177,8 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: drawer_context.draw_format(),
-            width: size.x,
-            height: size.y,
+            width: size.x(),
+            height: size.y(),
             present_mode: wgpu::PresentMode::Fifo,
             desired_maximum_frame_latency: 2,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
@@ -290,7 +290,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
                     state,
                     Some(vec2i(
                         position.x as i32,
-                        window.inner.size.get(state).y as i32 - position.y as i32,
+                        window.inner.size.get(state).y() as i32 - position.y as i32,
                     )),
                 );
             }
@@ -434,12 +434,10 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
         let _ = (event_loop, device_id);
         #[allow(clippy::single_match)]
         match event {
-            winit::event::DeviceEvent::Key(
-                winit::event::RawKeyEvent {
-                    physical_key: winit::keyboard::PhysicalKey::Code(key_code),
-                    state: s
-                }
-            ) => {
+            winit::event::DeviceEvent::Key(winit::event::RawKeyEvent {
+                physical_key: winit::keyboard::PhysicalKey::Code(key_code),
+                state: s,
+            }) => {
                 self.keys_held.with_mut(state, |held| {
                     if *s == winit::event::ElementState::Pressed {
                         held.insert(*key_code);

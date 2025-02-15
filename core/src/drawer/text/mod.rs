@@ -3,7 +3,7 @@ use super::*;
 pub use image_tt::*;
 use std::iter::Peekable;
 use std::marker::PhantomData;
-use uial_geometry::Dir2i;
+use crate::geometry::Dir2i;
 
 /// Describes a method of converting arbitrary strings of text into a form that can be drawn
 /// to a [`RasterDrawer`]. This fully captures all information about the appearance/style of the
@@ -156,7 +156,7 @@ pub trait TextDrawer: RasterDrawer {
 
     /// Shortcut for [`TextDrawer::draw_text_immediate`] for left-to-right text.
     fn draw_text_immediate_ltr<F: Font<Self>>(&mut self, font: &F, offset: Vector2i, str: &str) {
-        self.draw_text_immediate(font, Dir2i::PosX, offset, str)
+        self.draw_text_immediate(font, Dir2i::Xp, offset, str)
     }
 
     /// Draws text to this [`TextDrawer`] from a [`TextBuffer`].

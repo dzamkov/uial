@@ -9,6 +9,7 @@ mod time;
 mod unique;
 pub mod widget;
 pub mod prelude;
+pub mod geometry;
 
 pub use cache::*;
 pub use input::*;
@@ -16,11 +17,6 @@ pub use prop::*;
 pub use sizing::*;
 pub use time::*;
 use prelude::*;
-
-/// Re-exports of the [`uial_geometry`] crate.
-pub mod geometry {
-    pub use uial_geometry::*;
-}
 
 /// A [`num_rational::Ratio`] of [`u32`]s.
 pub type RationalU32 = num_rational::Ratio<u32>;

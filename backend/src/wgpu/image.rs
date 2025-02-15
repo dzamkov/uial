@@ -70,10 +70,7 @@ impl ImageSource for WgpuImageAtlas {
     fn image_part(&self, rect: Box2i, sub: Box2i) -> Option<Box2i> {
         // TODO: Bounds checking
         Some(Box2i::from_min_size(
-            vec2i(
-                rect.min.x + sub.min.x,
-                rect.max_exclusive.y - sub.max_exclusive.y,
-            ),
+            vec2i(rect.min().x + sub.min().x, rect.max().y - sub.max().y),
             sub.size(),
         ))
     }
@@ -115,7 +112,10 @@ impl ImageManager for WgpuImageAtlas {
                     atlas: self.weak_self.upgrade().unwrap(),
                     alloc,
                 },
-                Box2i::from_min_max(vec2i(rect.min.x, rect.min.y), vec2i(rect.max.x, rect.max.y)),
+                Box2i::from_min_max(
+                    vec2i(rect.min.x, rect.min.y),
+                    vec2i(rect.max.x - 1, rect.max.y - 1),
+                ),
             )
         } else {
             todo!()

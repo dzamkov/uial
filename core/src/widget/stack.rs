@@ -212,14 +212,14 @@ impl<
         let layout = self.0.layout(env);
         if SIDE {
             if VERTICAL {
-                size2i(layout.size.x, layout.size.y - layout.split)
+                size2i(layout.size.x(), layout.size.y() - layout.split)
             } else {
-                size2i(layout.size.x - layout.split, layout.size.y)
+                size2i(layout.size.x() - layout.split, layout.size.y())
             }
         } else if VERTICAL {
-            size2i(layout.size.x, layout.split)
+            size2i(layout.size.x(), layout.split)
         } else {
-            size2i(layout.split, layout.size.y)
+            size2i(layout.split, layout.size.y())
         }
     }
 
@@ -298,12 +298,12 @@ impl<
 /// Determines the width allocated to `a`, given the target splitting ratio and the actual size
 /// of a stack.
 fn split_size_x(a: &Sizing, b: &Sizing, split: RationalU32, size: Size2i) -> u32 {
-    let y = size.y;
+    let y = size.y();
     split_size(
         a,
         b,
         split,
-        size.x,
+        size.x(),
         |s, max_x| s.upto_x(max_x, y),
         |s, min_x| s.downto_x(min_x, y),
     )
@@ -312,12 +312,12 @@ fn split_size_x(a: &Sizing, b: &Sizing, split: RationalU32, size: Size2i) -> u32
 /// Determines the height allocated to `a`, given the target splitting ratio and the actual size
 /// of a stack.
 fn split_size_y(a: &Sizing, b: &Sizing, split: RationalU32, size: Size2i) -> u32 {
-    let x = size.x;
+    let x = size.x();
     split_size(
         a,
         b,
         split,
-        size.y,
+        size.y(),
         |s, max_y| s.upto_y(x, max_y),
         |s, min_y| s.downto_y(x, min_y),
     )

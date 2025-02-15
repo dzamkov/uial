@@ -57,7 +57,7 @@ impl Sizing {
     /// Constructs a [`Sizing`] which includes every [`Size2i`].
     pub fn any() -> Self {
         Self::from_samples([Sample {
-            size: size2i(0, 0),
+            size: size2i(1, 1),
             ty: SampleType::Include,
         }])
     }
@@ -72,13 +72,22 @@ impl Sizing {
         Self::range(value, value)
     }
 
+    /// Constructs a [`Sizing`] consisting of the [`Size2i`] whose components are greater than or
+    /// equal to `min`.
+    pub fn minimum(min: Size2i) -> Self {
+        Self::from_samples([Sample {
+            size: min,
+            ty: SampleType::Include,
+        }])
+    }
+
     /// Constructs a [`Sizing`] consisting of the [`Size2i`] whose components are greater than
     /// or equal to `min`, and less than or equal to `max`.
     pub fn range(min: Size2i, max: Size2i) -> Self {
-        if max.x < min.x || max.y < min.y {
+        if max.x_minus_1 < min.x_minus_1 || max.y_minus_1 < min.y_minus_1 {
             Self::none()
-        } else if max.x == u32::MAX {
-            if max.y == u32::MAX {
+        } else if max.x_minus_1 == u32::MAX {
+            if max.y_minus_1 == u32::MAX {
                 Self::from_samples([Sample {
                     size: min,
                     ty: SampleType::Include,
@@ -90,19 +99,25 @@ impl Sizing {
                         ty: SampleType::Include,
                     },
                     Sample {
-                        size: size2i(min.x, max.y + 1),
+                        size: Size2i {
+                            x_minus_1: min.x_minus_1,
+                            y_minus_1: max.y_minus_1 + 1,
+                        },
                         ty: SampleType::Exclude,
                     },
                 ])
             }
-        } else if max.y == u32::MAX {
+        } else if max.y_minus_1 == u32::MAX {
             Self::from_samples([
                 Sample {
                     size: min,
                     ty: SampleType::Include,
                 },
                 Sample {
-                    size: size2i(max.x + 1, min.y),
+                    size: Size2i {
+                        x_minus_1: max.x_minus_1 + 1,
+                        y_minus_1: min.y_minus_1,
+                    },
                     ty: SampleType::Exclude,
                 },
             ])
@@ -113,11 +128,17 @@ impl Sizing {
                     ty: SampleType::Include,
                 },
                 Sample {
-                    size: size2i(max.x + 1, min.y),
+                    size: Size2i {
+                        x_minus_1: max.x_minus_1 + 1,
+                        y_minus_1: min.y_minus_1,
+                    },
                     ty: SampleType::Exclude,
                 },
                 Sample {
-                    size: size2i(min.x, max.y + 1),
+                    size: Size2i {
+                        x_minus_1: min.x_minus_1,
+                        y_minus_1: max.y_minus_1 + 1,
+                    },
                     ty: SampleType::Exclude,
                 },
             ])
@@ -140,25 +161,52 @@ impl Sizing {
     /// returns the `min` and `max` arguments for it.
     pub fn as_range(&self) -> Option<(Size2i, Size2i)> {
         match &*self.samples {
-            [] => Some((size2i(u32::MAX, u32::MAX), size2i(0, 0))),
+            [] => Some((
+                Size2i {
+                    x_minus_1: u32::MAX,
+                    y_minus_1: u32::MAX,
+                },
+                Size2i {
+                    x_minus_1: 0,
+                    y_minus_1: 0,
+                },
+            )),
             [Sample {
                 size: min,
                 ty: SampleType::Include,
-            }] => Some((*min, size2i(u32::MAX, u32::MAX))),
+            }] => Some((
+                *min,
+                Size2i {
+                    x_minus_1: u32::MAX,
+                    y_minus_1: u32::MAX,
+                },
+            )),
             [Sample {
                 size: min,
                 ty: SampleType::Include,
             }, Sample {
                 size: bound_y,
                 ty: SampleType::Exclude,
-            }] if min.x == bound_y.x => Some((*min, size2i(u32::MAX, bound_y.y - 1))),
+            }] if min.x_minus_1 == bound_y.x_minus_1 => Some((
+                *min,
+                Size2i {
+                    x_minus_1: u32::MAX,
+                    y_minus_1: bound_y.y_minus_1 - 1,
+                },
+            )),
             [Sample {
                 size: min,
                 ty: SampleType::Include,
             }, Sample {
                 size: bound_x,
                 ty: SampleType::Exclude,
-            }] if min.y == bound_x.y => Some((*min, size2i(bound_x.x - 1, u32::MAX))),
+            }] if min.y_minus_1 == bound_x.y_minus_1 => Some((
+                *min,
+                Size2i {
+                    x_minus_1: bound_x.x_minus_1 - 1,
+                    y_minus_1: u32::MAX,
+                },
+            )),
             [Sample {
                 size: min,
                 ty: SampleType::Include,
@@ -168,8 +216,14 @@ impl Sizing {
             }, Sample {
                 size: bound_y,
                 ty: SampleType::Exclude,
-            }] if min.x == bound_y.x && min.y == bound_x.y => {
-                Some((*min, size2i(bound_x.x - 1, bound_y.y - 1)))
+            }] if min.x_minus_1 == bound_y.x_minus_1 && min.y_minus_1 == bound_x.y_minus_1 => {
+                Some((
+                    *min,
+                    Size2i {
+                        x_minus_1: bound_x.x_minus_1 - 1,
+                        y_minus_1: bound_y.y_minus_1 - 1,
+                    },
+                ))
             }
             _ => None,
         }
@@ -180,7 +234,7 @@ impl Sizing {
     pub fn extend_x(&self) -> Self {
         // TODO: Real implementation
         if let Some((min, mut max)) = self.as_range() {
-            max.x = u32::MAX;
+            max.x_minus_1 = u32::MAX;
             Self::range(min, max)
         } else {
             todo!()
@@ -192,7 +246,7 @@ impl Sizing {
     pub fn extend_y(&self) -> Self {
         // TODO: Real implementation
         if let Some((min, mut max)) = self.as_range() {
-            max.y = u32::MAX;
+            max.y_minus_1 = u32::MAX;
             Self::range(min, max)
         } else {
             todo!()
@@ -206,7 +260,13 @@ impl Sizing {
     pub fn minimize_x(&self) -> Self {
         // TODO: Real implementation
         if let Some((min, max)) = self.as_range() {
-            Self::range(min, size2i(min.x, max.y))
+            Self::range(
+                min,
+                Size2i {
+                    x_minus_1: min.x_minus_1,
+                    y_minus_1: max.y_minus_1,
+                },
+            )
         } else {
             todo!()
         }
@@ -219,7 +279,13 @@ impl Sizing {
     pub fn minimize_y(&self) -> Self {
         // TODO: Real implementation
         if let Some((min, max)) = self.as_range() {
-            Self::range(min, size2i(max.x, min.y))
+            Self::range(
+                min,
+                Size2i {
+                    x_minus_1: max.x_minus_1,
+                    y_minus_1: min.y_minus_1,
+                },
+            )
         } else {
             todo!()
         }
@@ -230,11 +296,14 @@ impl Sizing {
     pub fn stack_x(a: &Self, b: &Self) -> Self {
         // TODO: Real implementation
         if let (Some((min_a, max_a)), Some((min_b, max_b))) = (a.as_range(), b.as_range()) {
-            let min = size2i(min_a.x + min_b.x, u32::max(min_a.y, min_b.y));
-            let max = size2i(
-                u32::saturating_add(max_a.x, max_b.x),
-                u32::min(max_a.y, max_b.y),
-            );
+            let min = Size2i {
+                x_minus_1: min_a.x_minus_1 + min_b.x_minus_1 + 1,
+                y_minus_1: u32::max(min_a.y_minus_1, min_b.y_minus_1),
+            };
+            let max = Size2i {
+                x_minus_1: u32::saturating_add(max_a.x_minus_1, max_b.x_minus_1).saturating_add(1),
+                y_minus_1: u32::min(max_a.y_minus_1, max_b.y_minus_1),
+            };
             Self::range(min, max)
         } else {
             todo!()
@@ -246,11 +315,14 @@ impl Sizing {
     pub fn stack_y(a: &Self, b: &Self) -> Self {
         // TODO: Real implementation
         if let (Some((min_a, max_a)), Some((min_b, max_b))) = (a.as_range(), b.as_range()) {
-            let min = size2i(u32::max(min_a.x, min_b.x), min_a.y + min_b.y);
-            let max = size2i(
-                u32::min(max_a.x, max_b.x),
-                u32::saturating_add(max_a.y, max_b.y),
-            );
+            let min = Size2i {
+                x_minus_1: u32::max(min_a.x_minus_1, min_b.x_minus_1),
+                y_minus_1: min_a.y_minus_1 + min_b.y_minus_1 + 1,
+            };
+            let max = Size2i {
+                x_minus_1: u32::min(max_a.x_minus_1, max_b.x_minus_1),
+                y_minus_1: u32::saturating_add(max_a.y_minus_1, max_b.y_minus_1).saturating_add(1),
+            };
             Self::range(min, max)
         } else {
             todo!()
@@ -265,10 +337,10 @@ impl Sizing {
             let (sample, _) = find_effective(before_samples(&self.samples, size), size);
             match sample.ty {
                 SampleType::Exclude => {
-                    if sample.size.x == 0 {
+                    if sample.size.x_minus_1 == 0 {
                         return None;
                     } else {
-                        max_x = sample.size.x - 1;
+                        max_x = sample.size.x_minus_1;
                     }
                 }
                 SampleType::Include => return Some(max_x),
@@ -285,10 +357,10 @@ impl Sizing {
             let (sample, _) = find_effective(before_samples(&self.samples, size), size);
             match sample.ty {
                 SampleType::Exclude => {
-                    if sample.size.y == 0 {
+                    if sample.size.y_minus_1 == 0 {
                         return None;
                     } else {
-                        max_y = sample.size.y - 1;
+                        max_y = sample.size.y_minus_1;
                     }
                 }
                 SampleType::Include => return Some(max_y),
@@ -306,9 +378,9 @@ impl Sizing {
             match sample.ty {
                 SampleType::Exclude => {
                     if let Some(after_sample) = self.samples.get(after_i) {
-                        if after_sample.size.y <= y {
-                            debug_assert!(min_x < after_sample.size.x);
-                            min_x = after_sample.size.x;
+                        if after_sample.size.y() <= y {
+                            debug_assert!(min_x < after_sample.size.x());
+                            min_x = after_sample.size.x();
                             continue;
                         }
                     }
@@ -330,8 +402,8 @@ impl Sizing {
                 SampleType::Exclude => {
                     for i in after_i..self.samples.len() {
                         let after_sample = &self.samples[i];
-                        if after_sample.size.x <= x {
-                            min_y = after_sample.size.y;
+                        if after_sample.size.x() <= x {
+                            min_y = after_sample.size.y();
                             continue 'main;
                         }
                     }
@@ -342,12 +414,29 @@ impl Sizing {
             }
         }
     }
+
+    /// Adds the given amount to all sizes in this [`Sizing`].
+    pub fn add_assign(&mut self, x: u32, y: u32) {
+        for sample in self.samples.iter_mut() {
+            sample.size.x_minus_1 += x;
+            sample.size.y_minus_1 += y;
+        }
+    }
+}
+
+/// Compares two [`Size2i`]s lexicographically.
+fn cmp_size(a: Size2i, b: Size2i) -> std::cmp::Ordering {
+    match a.y_minus_1.cmp(&b.y_minus_1) {
+        core::cmp::Ordering::Equal => {}
+        ord => return ord,
+    }
+    a.x_minus_1.cmp(&b.x_minus_1)
 }
 
 /// Gets the sublist of samples that are lexicographically before (or at) a given [`Size2i`].
 /// This will always start at the beginning of the samples list.
 fn before_samples(samples: &[Sample], value: Size2i) -> &[Sample] {
-    match samples.binary_search_by(|s| s.size.cmp(&value)) {
+    match samples.binary_search_by(|s| cmp_size(s.size, value)) {
         Ok(i) => &samples[0..(i + 1)],
         Err(i) => &samples[0..i],
     }
@@ -355,7 +444,7 @@ fn before_samples(samples: &[Sample], value: Size2i) -> &[Sample] {
 
 /// A "virtual" [`Sample`] that applies to [`Size2i`]s for which no other sample is effective.
 static ROOT_SAMPLE: Sample = Sample {
-    size: size2i(0, 0),
+    size: size2i(1, 1),
     ty: SampleType::Exclude,
 };
 
@@ -367,7 +456,7 @@ fn find_effective(before_samples: &[Sample], value: Size2i) -> (&Sample, usize) 
     while cur > 0 {
         cur -= 1;
         let sample = &before_samples[cur];
-        if sample.size.x <= value.x {
+        if sample.size.x_minus_1 <= value.x_minus_1 {
             return (sample, cur + 1);
         }
     }
@@ -382,24 +471,6 @@ fn contains(before_samples: &[Sample], value: Size2i) -> bool {
         SampleType::Exclude => false,
         SampleType::Include => true,
         SampleType::Lookback { .. } => todo!(),
-    }
-}
-
-impl AddAssign<Size2i> for Sizing {
-    /// Adds the given [`Size2i`] to all sizes in this [`Sizing`].
-    fn add_assign(&mut self, rhs: Size2i) {
-        for sample in self.samples.iter_mut() {
-            sample.size += rhs;
-        }
-    }
-}
-
-impl Add<Size2i> for &Sizing {
-    type Output = Sizing;
-    fn add(self, rhs: Size2i) -> Self::Output {
-        let mut res = self.clone();
-        res += rhs;
-        res
     }
 }
 
@@ -477,7 +548,10 @@ impl Sizing {
 
                 // Advance to next size
                 if upto_x < u32::MAX {
-                    let head = size2i(upto_x + 1, res.head().y);
+                    let head = Size2i {
+                        x_minus_1: upto_x,
+                        y_minus_1: res.head().y_minus_1,
+                    };
                     res.advance(head);
                     a.advance(head);
                     b.advance(head);
@@ -488,7 +562,10 @@ impl Sizing {
 
             // Advance to next line
             if upto_y < u32::MAX {
-                let head = size2i(0, upto_y + 1);
+                let head = Size2i {
+                    x_minus_1: 0,
+                    y_minus_1: upto_y,
+                };
                 res.advance(head);
                 a.advance(head);
                 b.advance(head);
@@ -517,9 +594,9 @@ impl Sizing {
     fn read(&self) -> SizingReader {
         SizingReader {
             samples: &self.samples,
-            head: size2i(0, 0),
+            head: size2i(1, 1),
             next: match &*self.samples {
-                [first, ..] if first.size == size2i(0, 0) => 1,
+                [first, ..] if first.size == size2i(1, 1) => 1,
                 _ => 0,
             },
         }
@@ -541,10 +618,10 @@ impl SizingReader<'_> {
     /// Advances `head` to the given [`Size2i`], which must be lexicographically at or after the
     /// current `head`.
     pub fn advance(&mut self, to: Size2i) {
-        assert!(self.head <= to);
+        assert!(cmp_size(self.head, to) <= std::cmp::Ordering::Equal);
         self.head = to;
         while self.next < self.samples.len() {
-            if self.samples[self.next].size <= self.head {
+            if cmp_size(self.samples[self.next].size, self.head) <= std::cmp::Ordering::Equal {
                 self.next += 1;
             } else {
                 break;
@@ -564,22 +641,22 @@ impl SizingReader<'_> {
         // Determine X validity range
         let mut upto_x = u32::MAX;
         while next < self.next {
-            upto_x = upto_x.min(self.samples[next].size.x - 1);
+            upto_x = upto_x.min(self.samples[next].size.x_minus_1);
             next += 1;
         }
         if self.next < self.samples.len() {
             let mut next_y = self.next;
             let next_sample = &self.samples[self.next];
-            if next_sample.size.y == self.head.y {
-                upto_x = upto_x.min(next_sample.size.x - 1);
+            if next_sample.size.y_minus_1 == self.head.y_minus_1 {
+                upto_x = upto_x.min(next_sample.size.x_minus_1);
                 next_y += 1;
             }
 
             // Determine Y validity range
             while next_y < self.samples.len() {
                 let next_y_sample = &self.samples[next_y];
-                if next_y_sample.size.x <= upto_x {
-                    return (upto_x, next_y_sample.size.y - 1);
+                if next_y_sample.size.x() <= upto_x {
+                    return (upto_x, next_y_sample.size.y_minus_1);
                 } else {
                     next_y += 1;
                 }
@@ -601,11 +678,11 @@ struct SizingBuilder {
 }
 
 impl SizingBuilder {
-    /// Creates a new [`SizingBuilder`] with `head` starting at `size2i(0, 0)`.
+    /// Creates a new [`SizingBuilder`] with `head` starting at `size2i(1, 1)`.
     pub fn new() -> Self {
         Self {
             samples: Vec::new(),
-            head: size2i(0, 0),
+            head: size2i(1, 1),
         }
     }
 
@@ -638,12 +715,12 @@ impl SizingBuilder {
     /// current `head`. This will "confirm" the predicted memberships of the [`Size2i`]s in
     /// between.
     pub fn advance(&mut self, to: Size2i) {
-        assert!(self.head <= to);
+        assert!(cmp_size(self.head, to) <= std::cmp::Ordering::Equal);
         self.head = to;
     }
 
     /// Gets the current extrapolation of the [`Size2i`] memberships whose X component is at or
-    /// after `head.x`. Provides the last X component for which this extrapolation is valid.
+    /// after `head.x()`. Provides the last X component for which this extrapolation is valid.
     ///
     /// If the builder is advanced past these [`Size2i`]s without calling `set` to determine
     /// their membership, the returned extrapolation will be used to determine their membership.
@@ -658,7 +735,7 @@ impl SizingBuilder {
                 SampleType::Lookback { .. } => todo!(),
             },
             if next < self.samples.len() {
-                self.samples[next].size.x - 1
+                self.samples[next].size.x_minus_1
             } else {
                 u32::MAX
             },
@@ -705,11 +782,11 @@ fn test_range_union_1() {
 
 #[test]
 fn test_range_union_2() {
-    let a = Sizing::range(size2i(0, 10), size2i(30, 20));
-    let b = Sizing::range(size2i(10, 0), size2i(20, 30));
+    let a = Sizing::range(size2i(1, 10), size2i(30, 20));
+    let b = Sizing::range(size2i(10, 1), size2i(20, 30));
     let c = &a | &b;
-    for x in 0..32 {
-        for y in 0..32 {
+    for x in 1..32 {
+        for y in 1..32 {
             let size = size2i(x, y);
             assert_eq!(c.contains(size), a.contains(size) | b.contains(size));
         }
@@ -720,15 +797,41 @@ fn test_range_union_2() {
 fn test_stack_simple() {
     let a = Sizing::exact(size2i(10, 10));
     let b = Sizing::any();
-    let c = Sizing::range(size2i(10, 10), size2i(u32::MAX, 10));
+    let c = Sizing::range(
+        size2i(11, 10),
+        Size2i {
+            x_minus_1: u32::MAX,
+            y_minus_1: 10 - 1,
+        },
+    );
     assert_eq!(Sizing::stack_x(&a, &b), c);
 }
 
 #[test]
-fn test_extend_simple() {
+fn test_extend_x() {
+    assert_eq!(
+        Sizing::exact(size2i(10, 10)).extend_x(),
+        Sizing::range(
+            size2i(10, 10),
+            Size2i {
+                x_minus_1: u32::MAX,
+                y_minus_1: 10 - 1,
+            }
+        )
+    );
+}
+
+#[test]
+fn test_extend_both() {
     assert_eq!(
         Sizing::exact(size2i(10, 10)).extend_x().extend_y(),
-        Sizing::range(size2i(10, 10), size2i(u32::MAX, u32::MAX))
+        Sizing::range(
+            size2i(10, 10),
+            Size2i {
+                x_minus_1: u32::MAX,
+                y_minus_1: u32::MAX,
+            }
+        )
     );
 }
 

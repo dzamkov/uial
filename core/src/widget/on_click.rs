@@ -79,7 +79,7 @@ impl<Env: WidgetEnvironment + ?Sized, F: Fn(&mut Env), S: WidgetSlot<Env>, T: Wi
                 CursorEventResponse::Handled => CursorEventResponse::Handled,
                 CursorEventResponse::Start(_) => todo!(),
                 CursorEventResponse::Bubble => {
-                    if self.slot.bounds(env).contains_exclusive(pos) {
+                    if self.slot.bounds(env).contains(pos) {
                         CursorEventResponse::Start(CursorInteractionRequest {
                             scope: FocusScope::NONE,
                             // TODO: Remove need for boxing
@@ -123,7 +123,7 @@ impl<
             is_down: false,
         } = event
         {
-            if self.slot.bounds(env).contains_exclusive(pos) {
+            if self.slot.bounds(env).contains(pos) {
                 (self.handler)(env);
             }
             CursorInteractionEventResponse::End
