@@ -283,72 +283,75 @@ impl WgpuDrawerContext {
             inner(&mut drawer);
             let mut rpass = drawer.rpass;
 
-            // Build geometry buffers
-            vertex_buffer =
-                self.context
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: bytemuck::cast_slice(&drawer.verts),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
-            let mut draw_start = 0;
-            let mut draw_calls = Vec::new();
-            let mut indices = drawer.opaque_lines;
-            let draw_end = indices.len() as u32;
-            if draw_end > draw_start {
-                draw_calls.push(DrawCall::Lines(draw_start..draw_end));
-                draw_start = draw_end;
-            }
-            indices.extend(drawer.opaque_tris);
-            let draw_end = indices.len() as u32;
-            if draw_end > draw_start {
-                draw_calls.push(DrawCall::Tris(draw_start..draw_end));
-                draw_start = draw_end;
-            }
-            for draw in drawer.extra_draws {
-                match draw {
-                    ExtraDraw::Lines(lines) => {
-                        indices.extend(lines);
-                        let draw_end = indices.len() as u32;
-                        if draw_end > draw_start {
-                            draw_calls.push(DrawCall::Lines(draw_start..draw_end));
-                            draw_start = draw_end;
+            // Check whether any drawing was done
+            if !drawer.verts.is_empty() {
+                // Build geometry buffers
+                vertex_buffer =
+                    self.context
+                        .device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: None,
+                            contents: bytemuck::cast_slice(&drawer.verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+                let mut draw_start = 0;
+                let mut draw_calls = Vec::new();
+                let mut indices = drawer.opaque_lines;
+                let draw_end = indices.len() as u32;
+                if draw_end > draw_start {
+                    draw_calls.push(DrawCall::Lines(draw_start..draw_end));
+                    draw_start = draw_end;
+                }
+                indices.extend(drawer.opaque_tris);
+                let draw_end = indices.len() as u32;
+                if draw_end > draw_start {
+                    draw_calls.push(DrawCall::Tris(draw_start..draw_end));
+                    draw_start = draw_end;
+                }
+                for draw in drawer.extra_draws {
+                    match draw {
+                        ExtraDraw::Lines(lines) => {
+                            indices.extend(lines);
+                            let draw_end = indices.len() as u32;
+                            if draw_end > draw_start {
+                                draw_calls.push(DrawCall::Lines(draw_start..draw_end));
+                                draw_start = draw_end;
+                            }
                         }
-                    }
-                    ExtraDraw::Tris(tris) => {
-                        // TODO: Combine with `opaque_tris` draw call, if possible
-                        indices.extend(tris);
-                        let draw_end = indices.len() as u32;
-                        if draw_end > draw_start {
-                            draw_calls.push(DrawCall::Tris(draw_start..draw_end));
-                            draw_start = draw_end;
+                        ExtraDraw::Tris(tris) => {
+                            // TODO: Combine with `opaque_tris` draw call, if possible
+                            indices.extend(tris);
+                            let draw_end = indices.len() as u32;
+                            if draw_end > draw_start {
+                                draw_calls.push(DrawCall::Tris(draw_start..draw_end));
+                                draw_start = draw_end;
+                            }
                         }
                     }
                 }
-            }
-            index_buffer =
-                self.context
-                    .device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: bytemuck::cast_slice(&indices),
-                        usage: wgpu::BufferUsages::INDEX,
-                    });
+                index_buffer =
+                    self.context
+                        .device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: None,
+                            contents: bytemuck::cast_slice(&indices),
+                            usage: wgpu::BufferUsages::INDEX,
+                        });
 
-            // Render contents of buffers
-            rpass.set_bind_group(1, &self.bind_group_1, &[]);
-            rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
-            rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            for draw_call in draw_calls {
-                match draw_call {
-                    DrawCall::Lines(indices) => {
-                        rpass.set_pipeline(&self.line_pipeline);
-                        rpass.draw_indexed(indices, 0, 0..1);
-                    }
-                    DrawCall::Tris(indices) => {
-                        rpass.set_pipeline(&self.tri_pipeline);
-                        rpass.draw_indexed(indices, 0, 0..1);
+                // Render contents of buffers
+                rpass.set_bind_group(1, &self.bind_group_1, &[]);
+                rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                for draw_call in draw_calls {
+                    match draw_call {
+                        DrawCall::Lines(indices) => {
+                            rpass.set_pipeline(&self.line_pipeline);
+                            rpass.draw_indexed(indices, 0, 0..1);
+                        }
+                        DrawCall::Tris(indices) => {
+                            rpass.set_pipeline(&self.tri_pipeline);
+                            rpass.draw_indexed(indices, 0, 0..1);
+                        }
                     }
                 }
             }
