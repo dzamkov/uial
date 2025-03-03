@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Contains [`Restrict`]-related extension methods for [`Widget`].
-pub trait RestrictWidgetExt: WidgetBase + Sized {
+pub trait RestrictWidgetExt: WidgetLike + Sized {
     /// Restricts this [`Widget`] to the sizes allowed by the given [`Sizing`].
     fn with_sizing(self, sizing: Sizing) -> Restrict<Self, Const<Sizing>> {
         Restrict::new(self, Const(sizing))
@@ -97,22 +97,22 @@ pub trait RestrictWidgetExt: WidgetBase + Sized {
     }
 }
 
-impl<T: WidgetBase> RestrictWidgetExt for T {}
+impl<T: WidgetLike> RestrictWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which restricts the possible sizes it can be instantiated with.
-pub struct Restrict<T: WidgetBase, S: PropertyBase<Value = Sizing>> {
+pub struct Restrict<T: WidgetLike, S: PropertyBase<Value = Sizing>> {
     inner: T,
     sizing: S,
 }
 
-impl<T: WidgetBase, S: PropertyBase<Value = Sizing>> Restrict<T, S> {
+impl<T: WidgetLike, S: PropertyBase<Value = Sizing>> Restrict<T, S> {
     /// Constructs a new [`Restrict`] widget.
     pub fn new(inner: T, sizing: S) -> Self {
         Self { inner, sizing }
     }
 }
 
-impl<T: WidgetBase> Restrict<T, Const<Sizing>> {
+impl<T: WidgetLike> Restrict<T, Const<Sizing>> {
     /// Restricts this [`Widget`] to the sizes allowed by the given [`Sizing`].
     pub fn with_sizing(mut self, sizing: Sizing) -> Self {
         self.sizing.0 = &self.sizing.0 & &sizing;
@@ -209,7 +209,18 @@ impl<T: WidgetBase> Restrict<T, Const<Sizing>> {
     }
 }
 
-impl<T: WidgetBase, S: PropertyBase<Value = Sizing>> WidgetBase for Restrict<T, S> {}
+impl<T: WidgetLike, S: PropertyBase<Value = Sizing>> WidgetLike for Restrict<T, S> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env>, S: Property<Env, Value = Sizing>>
+    IntoWidget<Env> for Restrict<T, S>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        Restrict {
+            inner: self.inner.into_widget(env),
+            sizing: self.sizing,
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, S: Property<Env, Value = Sizing>> Widget<Env>
     for Restrict<T, S>
@@ -219,14 +230,14 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, S: Property<Env, Value = S
             .with_ref(env, |sizing| &self.inner.sizing(env) & sizing)
     }
 
-    fn inst<'a, Slot: WidgetSlot<Env> + 'a>(
+    fn place<'a, Slot: WidgetSlot<Env> + 'a>(
         &'a self,
         env: &Env,
         slot: Slot,
-    ) -> impl WidgetInst<Env> + 'a
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        self.inner.inst(env, slot)
+        self.inner.place(env, slot)
     }
 }

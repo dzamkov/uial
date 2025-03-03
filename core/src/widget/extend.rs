@@ -1,8 +1,8 @@
-use crate::prelude::*;
 use crate::RationalU32;
+use crate::prelude::*;
 
 /// Contains [`Extend`]-related extension methods for [`Widget`].
-pub trait ExtendWidgetExt: WidgetBase + Sized {
+pub trait ExtendWidgetExt: WidgetLike + Sized {
     /// Applies a variable amount of padding to the left and right side of this [`Widget`].
     /// The ratio of the amount of left (-X) padding to the total amount of padding is specified by
     /// `align`.
@@ -36,7 +36,7 @@ pub trait ExtendWidgetExt: WidgetBase + Sized {
     }
 }
 
-impl<T: WidgetBase> ExtendWidgetExt for T {}
+impl<T: WidgetLike> ExtendWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which extends it horizontally or vertically by applying a
 /// variable amount of padding on either side.
@@ -65,7 +65,18 @@ impl<T, const VERTICAL: bool> Extend<T, VERTICAL> {
     }
 }
 
-impl<T: WidgetBase, const VERTICAL: bool> WidgetBase for Extend<T, VERTICAL> {}
+impl<T: WidgetLike, const VERTICAL: bool> WidgetLike for Extend<T, VERTICAL> {}
+
+impl<Env: WidgetEnvironment + Track + ?Sized, T: IntoWidget<Env>, const VERTICAL: bool>
+    IntoWidget<Env> for Extend<T, VERTICAL>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        Extend::<_, VERTICAL> {
+            inner: self.inner.into_widget(env),
+            align: self.align,
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + Track + ?Sized, T: Widget<Env>, const VERTICAL: bool> Widget<Env>
     for Extend<T, VERTICAL>
@@ -79,11 +90,15 @@ impl<Env: WidgetEnvironment + Track + ?Sized, T: Widget<Env>, const VERTICAL: bo
         }
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        self.inner.inst(
+        self.inner.place(
             env,
             ExtendSlot {
                 widget: self,
@@ -121,11 +136,11 @@ struct ExtendLayout {
 }
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        T: Widget<Env>,
-        S: WidgetSlot<Env>,
-        const VERTICAL: bool,
-    > ExtendSlot<'_, Env, T, S, VERTICAL>
+    Env: WidgetEnvironment + Track + ?Sized,
+    T: Widget<Env>,
+    S: WidgetSlot<Env>,
+    const VERTICAL: bool,
+> ExtendSlot<'_, Env, T, S, VERTICAL>
 {
     /// Gets the internal layout associated with this slot.
     pub fn layout(&self, env: &Env) -> ExtendLayout {
@@ -157,11 +172,11 @@ impl<
 }
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        T: Widget<Env>,
-        S: WidgetSlot<Env>,
-        const VERTICAL: bool,
-    > WidgetSlot<Env> for ExtendSlot<'_, Env, T, S, VERTICAL>
+    Env: WidgetEnvironment + Track + ?Sized,
+    T: Widget<Env>,
+    S: WidgetSlot<Env>,
+    const VERTICAL: bool,
+> WidgetSlot<Env> for ExtendSlot<'_, Env, T, S, VERTICAL>
 {
     fn is_visible(&self, env: &Env) -> bool {
         self.source.is_visible(env)

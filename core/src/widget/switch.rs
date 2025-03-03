@@ -5,7 +5,7 @@ use std::mem::ManuallyDrop;
 use std::rc::Rc;
 
 /// Contains [`Switch`]-related extension methods for [`Property`]s.
-pub trait SwitchWidgetExt<T: WidgetBase + ?Sized>: PropertyBase<Value = Rc<T>> + Sized {
+pub trait SwitchWidgetExt<T: WidgetLike + ?Sized>: PropertyBase<Value = Rc<T>> + Sized {
     /// Constructs a [`Widget`] which reflects the layout and appearance of the [`Widget`] inside
     /// this property.
     fn switch(self) -> Switch<Self, T> {
@@ -13,13 +13,21 @@ pub trait SwitchWidgetExt<T: WidgetBase + ?Sized>: PropertyBase<Value = Rc<T>> +
     }
 }
 
-impl<P: PropertyBase<Value = Rc<T>>, T: WidgetBase + ?Sized> SwitchWidgetExt<T> for P {}
+impl<P: PropertyBase<Value = Rc<T>>, T: WidgetLike + ?Sized> SwitchWidgetExt<T> for P {}
 
 /// A [`Widget`] defined by a [`Property`] which produces a widget. When the value of the property
 /// changes, the widget will completely change its layout and appearance to reflect the new value.
-pub struct Switch<P: PropertyBase<Value = Rc<T>>, T: WidgetBase + ?Sized>(P);
+pub struct Switch<P: PropertyBase<Value = Rc<T>>, T: WidgetLike + ?Sized>(P);
 
-impl<P: PropertyBase<Value = Rc<T>>, T: WidgetBase + ?Sized> WidgetBase for Switch<P, T> {}
+impl<P: PropertyBase<Value = Rc<T>>, T: WidgetLike + ?Sized> WidgetLike for Switch<P, T> {}
+
+impl<P: Property<Env, Value = Rc<T>>, T: Widget<Env> + ?Sized, Env: WidgetEnvironment + ?Sized>
+    IntoWidget<Env> for Switch<P, T>
+{
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
 
 impl<P: Property<Env, Value = Rc<T>>, T: Widget<Env> + ?Sized, Env: WidgetEnvironment + ?Sized>
     Widget<Env> for Switch<P, T>
@@ -28,11 +36,11 @@ impl<P: Property<Env, Value = Rc<T>>, T: Widget<Env> + ?Sized, Env: WidgetEnviro
         self.0.get(env).sizing(env)
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        SwitchInst {
+        SwitchPlaced {
             widget: self,
             cache: UnsafeCell::new(None),
             slot: Rc::new(slot),
@@ -40,8 +48,8 @@ impl<P: Property<Env, Value = Rc<T>>, T: Widget<Env> + ?Sized, Env: WidgetEnviro
     }
 }
 
-/// An instance of a [`Switch`] widget.
-struct SwitchInst<
+/// A [`Switch`] widget which has been placed in a [`WidgetSlot`].
+struct SwitchPlaced<
     'a,
     P: Property<Env, Value = Rc<T>>,
     T: Widget<Env> + ?Sized,
@@ -52,7 +60,7 @@ struct SwitchInst<
     // TODO: Once we are able to refer to the return type of `Widget::inst`, we shouldn't need
     // to use `dyn` anymore.
     #[allow(clippy::type_complexity)]
-    cache: UnsafeCell<Option<Rc<Dependent<T, dyn WidgetInst<Env> + 'a>>>>,
+    cache: UnsafeCell<Option<Rc<Dependent<T, dyn WidgetPlaced<Env> + 'a>>>>,
     slot: Rc<Slot>,
 }
 
@@ -73,15 +81,15 @@ impl<Back: ?Sized, Front: ?Sized> Drop for Dependent<Back, Front> {
 }
 
 impl<
-        'a,
-        P: Property<Env, Value = Rc<T>>,
-        T: Widget<Env> + ?Sized,
-        Env: WidgetEnvironment + ?Sized,
-        Slot: WidgetSlot<Env>,
-    > SwitchInst<'a, P, T, Env, Slot>
+    'a,
+    P: Property<Env, Value = Rc<T>>,
+    T: Widget<Env> + ?Sized,
+    Env: WidgetEnvironment + ?Sized,
+    Slot: WidgetSlot<Env>,
+> SwitchPlaced<'a, P, T, Env, Slot>
 {
     /// Gets the current [`WidgetInst`] for the [`SwitchInst`].
-    fn inner<'b>(&'b self, env: &'b Env) -> &'b Rc<Dependent<T, dyn WidgetInst<Env> + 'a>> {
+    fn inner<'b>(&'b self, env: &'b Env) -> &'b Rc<Dependent<T, dyn WidgetPlaced<Env> + 'a>> {
         self.widget.0.with_ref(env, |cur_widget| {
             let cache: &'b _ = unsafe { &*self.cache.get() };
 
@@ -95,15 +103,15 @@ impl<
             // Update the cache
             let new_cache = Rc::new(Dependent {
                 back: ManuallyDrop::new(cur_widget.clone()),
-                front: ManuallyDrop::new(cur_widget.inst(
+                front: ManuallyDrop::new(cur_widget.place(
                     env,
                     SwitchSlot {
                         source: self.slot.clone(),
                     },
                 )),
             });
-            let new_cache: Rc<Dependent<T, dyn WidgetInst<Env> + '_>> = new_cache;
-            let new_cache: Rc<Dependent<T, dyn WidgetInst<Env> + 'a>> =
+            let new_cache: Rc<Dependent<T, dyn WidgetPlaced<Env> + '_>> = new_cache;
+            let new_cache: Rc<Dependent<T, dyn WidgetPlaced<Env> + 'a>> =
                 unsafe { std::mem::transmute(new_cache) };
             unsafe {
                 *self.cache.get() = Some(new_cache);
@@ -116,11 +124,11 @@ impl<
 }
 
 impl<
-        P: Property<Env, Value = Rc<T>>,
-        T: Widget<Env> + ?Sized,
-        Env: WidgetEnvironment + ?Sized,
-        Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for SwitchInst<'_, P, T, Env, Slot>
+    P: Property<Env, Value = Rc<T>>,
+    T: Widget<Env> + ?Sized,
+    Env: WidgetEnvironment + ?Sized,
+    Slot: WidgetSlot<Env>,
+> WidgetPlaced<Env> for SwitchPlaced<'_, P, T, Env, Slot>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.inner(env).front.draw(env, drawer)

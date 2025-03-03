@@ -1,14 +1,14 @@
 use crate::prelude::*;
 
 /// Contains [`Pad`]-related extension methods for [`Widget`].
-pub trait PadWidgetExt: WidgetBase + Sized {
+pub trait PadWidgetExt: WidgetLike + Sized {
     /// Surrounds this [`Widget`] with the given amount of padding.
     fn with_padding(self, amount: Padding2i) -> Pad<Self> {
         Pad::new(self, amount)
     }
 }
 
-impl<T: WidgetBase> PadWidgetExt for T {}
+impl<T: WidgetLike> PadWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which surroundings it with a specified amount of padding.
 pub struct Pad<T> {
@@ -23,7 +23,16 @@ impl<T> Pad<T> {
     }
 }
 
-impl<T: WidgetBase> WidgetBase for Pad<T> {}
+impl<T: WidgetLike> WidgetLike for Pad<T> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env>> IntoWidget<Env> for Pad<T> {
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        Pad {
+            inner: self.inner.into_widget(env),
+            amount: self.amount,
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>> Widget<Env> for Pad<T> {
     fn sizing(&self, env: &Env) -> Sizing {
@@ -35,11 +44,15 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>> Widget<Env> for Pad<T> {
         res
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        self.inner.inst(
+        self.inner.place(
             env,
             PadSlot {
                 padding: &self.amount,

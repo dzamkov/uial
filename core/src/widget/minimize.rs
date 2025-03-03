@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Contains [`Minimize`]-related extension methods for [`Widget`].
-pub trait MinimizeWidgetExt: WidgetBase + Sized {
+pub trait MinimizeWidgetExt: WidgetLike + Sized {
     /// Forces the size of this [`Widget`] to be minimized along the X axis.
     fn minimize_h(self) -> MinimizeH<Self> {
         Minimize { inner: self }
@@ -20,7 +20,7 @@ pub trait MinimizeWidgetExt: WidgetBase + Sized {
     }
 }
 
-impl<T: WidgetBase> MinimizeWidgetExt for T {}
+impl<T: WidgetLike> MinimizeWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which forces its size to be minimized along the X axis.
 pub type MinimizeH<T> = Minimize<T, false>;
@@ -33,7 +33,17 @@ pub struct Minimize<T, const VERTICAL: bool> {
     inner: T,
 }
 
-impl<T: WidgetBase, const VERTICAL: bool> WidgetBase for Minimize<T, VERTICAL> {}
+impl<T: WidgetLike, const VERTICAL: bool> WidgetLike for Minimize<T, VERTICAL> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env>, const VERTICAL: bool> IntoWidget<Env>
+    for Minimize<T, VERTICAL>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        Minimize::<_, VERTICAL> {
+            inner: self.inner.into_widget(env),
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, const VERTICAL: bool> Widget<Env>
     for Minimize<T, VERTICAL>
@@ -47,10 +57,14 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, const VERTICAL: bool> Widg
         }
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        self.inner.inst(env, slot)
+        self.inner.place(env, slot)
     }
 }

@@ -26,7 +26,18 @@ impl<T, F> OnKey<T, F> {
     }
 }
 
-impl<T: WidgetBase, F> WidgetBase for OnKey<T, F> {}
+impl<T: WidgetLike, F> WidgetLike for OnKey<T, F> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env>, F: Fn(&mut Env, Key) -> bool>
+    IntoWidget<Env> for OnKey<T, F>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        OnKey {
+            inner: self.inner.into_widget(env),
+            on_key: self.on_key,
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, F: Fn(&mut Env, Key) -> bool> Widget<Env>
     for OnKey<T, F>
@@ -35,14 +46,18 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, F: Fn(&mut Env, Key) -> bo
         self.inner.sizing(env)
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        OnKeyInst {
+        OnKeyPlaced {
             handler: &self.on_key,
             slot: slot.clone(),
-            inner: self.inner.inst(
+            inner: self.inner.place(
                 env,
                 OnKeySlot {
                     handler: &self.on_key,
@@ -98,19 +113,19 @@ impl<Env: WidgetEnvironment + ?Sized, F: Fn(&mut Env, Key) -> bool, S: WidgetSlo
     }
 }
 
-/// A [`WidgetInst`] for an [`OnKey`] widget.
-struct OnKeyInst<'a, F, S, T> {
+/// A [`OnKey`] widget which has been placed in a [`WidgetSlot`].
+struct OnKeyPlaced<'a, F, S, T> {
     handler: &'a F,
     slot: S,
     inner: T,
 }
 
 impl<
-        Env: WidgetEnvironment + ?Sized,
-        F: Fn(&mut Env, Key) -> bool,
-        S: WidgetSlot<Env>,
-        T: WidgetInst<Env>,
-    > WidgetInst<Env> for OnKeyInst<'_, F, S, T>
+    Env: WidgetEnvironment + ?Sized,
+    F: Fn(&mut Env, Key) -> bool,
+    S: WidgetSlot<Env>,
+    T: WidgetPlaced<Env>,
+> WidgetPlaced<Env> for OnKeyPlaced<'_, F, S, T>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.inner.draw(env, drawer)
@@ -141,12 +156,12 @@ impl<
 }
 
 impl<
-        'ui,
-        Env: WidgetEnvironment + ?Sized,
-        F: Fn(&mut Env, Key) -> bool,
-        S: WidgetSlot<Env>,
-        T: WidgetInst<Env>,
-    > FocusInteractionHandler<'ui, Env> for OnKeyInst<'_, F, S, T>
+    'ui,
+    Env: WidgetEnvironment + ?Sized,
+    F: Fn(&mut Env, Key) -> bool,
+    S: WidgetSlot<Env>,
+    T: WidgetPlaced<Env>,
+> FocusInteractionHandler<'ui, Env> for OnKeyPlaced<'_, F, S, T>
 {
     fn general_event(
         &self,

@@ -28,11 +28,11 @@ impl<'a, Env: WidgetEnvironment + ?Sized> DynWidget<'a, Env> {
 /// An object-safe variant of [`Widget`].
 trait WidgetSafe<Env: WidgetEnvironment + ?Sized> {
     fn sizing(&self, env: &Env) -> Sizing;
-    fn inst<'a>(
+    fn place<'a>(
         &'a self,
         env: &Env,
         slot: Rc<dyn WidgetSlotSafe<Env> + 'a>,
-    ) -> Rc<dyn WidgetInst<Env> + 'a>
+    ) -> Rc<dyn WidgetPlaced<Env> + 'a>
     where
         Env: 'a;
 }
@@ -42,15 +42,15 @@ impl<Env: WidgetEnvironment + ?Sized, W: Widget<Env>> WidgetSafe<Env> for W {
         self.sizing(env)
     }
 
-    fn inst<'a>(
+    fn place<'a>(
         &'a self,
         env: &Env,
         slot: Rc<dyn WidgetSlotSafe<Env> + 'a>,
-    ) -> Rc<dyn WidgetInst<Env> + 'a>
+    ) -> Rc<dyn WidgetPlaced<Env> + 'a>
     where
         Env: 'a,
     {
-        self.inst(env, slot).into_rc_dyn()
+        self.place(env, slot).into_rc_dyn()
     }
 }
 
@@ -107,17 +107,31 @@ impl<Env: WidgetEnvironment + ?Sized> WidgetSlot<Env> for Rc<dyn WidgetSlotSafe<
     }
 }
 
-impl<Env: WidgetEnvironment + ?Sized> WidgetBase for DynWidget<'_, Env> {}
+impl<Env: WidgetEnvironment + ?Sized> WidgetLike for DynWidget<'_, Env> {}
+
+impl<Env: WidgetEnvironment + ?Sized> IntoWidget<Env> for DynWidget<'_, Env> {
+    #[allow(unreachable_code)]
+    fn into_widget(self, _: &Env) -> impl Widget<Env>
+    where
+        Self: Sized,
+    {
+        unreachable!() as crate::widget::Empty
+    }
+}
 
 impl<'a, Env: WidgetEnvironment + ?Sized + 'a> Widget<Env> for DynWidget<'a, Env> {
     fn sizing(&self, env: &Env) -> Sizing {
         self.0.sizing(env)
     }
 
-    fn inst<'b, S: WidgetSlot<Env> + 'b>(&'b self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'b
+    fn place<'b, S: WidgetSlot<Env> + 'b>(
+        &'b self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'b
     where
         Env: 'b,
     {
-        self.0.inst(env, Rc::new(slot))
+        self.0.place(env, Rc::new(slot))
     }
 }

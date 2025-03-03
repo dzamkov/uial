@@ -19,7 +19,16 @@ pub fn fill(paint: Paint) -> Fill {
     Fill::new(paint)
 }
 
-impl WidgetBase for Fill {}
+impl WidgetLike for Fill {}
+
+impl<Env: WidgetEnvironment + ?Sized> IntoWidget<Env> for Fill
+where
+    Env::Drawer: RasterDrawer,
+{
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized> Widget<Env> for Fill
 where
@@ -29,24 +38,24 @@ where
         Sizing::any()
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        FillInst {
+        FillPlaced {
             slot,
             paint: self.paint,
         }
     }
 }
 
-/// An instance of a [`Fill`] widget.
-struct FillInst<Slot> {
+/// A [`Fill`] widget which has been placed in a [`WidgetSlot`].
+struct FillPlaced<Slot> {
     slot: Slot,
     paint: Paint,
 }
 
-impl<Env: WidgetEnvironment + ?Sized, Slot: WidgetSlot<Env>> WidgetInst<Env> for FillInst<Slot>
+impl<Env: WidgetEnvironment + ?Sized, Slot: WidgetSlot<Env>> WidgetPlaced<Env> for FillPlaced<Slot>
 where
     Env::Drawer: RasterDrawer,
 {

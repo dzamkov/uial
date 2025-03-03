@@ -11,25 +11,31 @@ pub fn empty() -> Empty {
     Empty
 }
 
+impl WidgetLike for Empty {}
+
+impl<Env: WidgetEnvironment + ?Sized> IntoWidget<Env> for Empty {
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
+
 impl<Env: WidgetEnvironment + ?Sized> Widget<Env> for Empty {
     fn sizing(&self, _: &Env) -> Sizing {
         Sizing::any()
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, _: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, _: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        EmptyInst
+        EmptyPlaced
     }
 }
 
-/// An instance of an [`Empty`] widget.
-struct EmptyInst;
+/// An [`Empty`] widget which has been placed in a [`WidgetSlot`].
+struct EmptyPlaced;
 
-impl WidgetBase for Empty {}
-
-impl<Env: WidgetEnvironment + ?Sized> WidgetInst<Env> for EmptyInst {
+impl<Env: WidgetEnvironment + ?Sized> WidgetPlaced<Env> for EmptyPlaced {
     fn draw(&self, _: &Env, _: &mut Env::Drawer) {
         // Do nothing
     }

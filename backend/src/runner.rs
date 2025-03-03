@@ -22,16 +22,16 @@ struct WgpuEnvironment {
 
 /// Represents a window managed by a [`Runner`].
 struct RunnerWindow<'a, S: HasReact + Track> {
-    // NOTE: `cursor_handler` may contain references to `root_inst` that are hidden from the borrow
-    // checker. It must be dropped before `root_inst`.
+    // NOTE: `cursor_handler` may contain references to `root_placed` that are hidden from the borrow
+    // checker. It must be dropped before `root_placed`.
     cursor_handler: ReactCell<S::React, Option<RunCursorInteractionHandler<'static, S>>>,
     cursor_pos: ReactCell<S::React, Option<Point2i>>,
-    // NOTE: `focus_handler` may contain references to `root_inst` that are hidden from the borrow
-    // checker. It must be dropped before `root_inst`.
+    // NOTE: `focus_handler` may contain references to `root_placed` that are hidden from the borrow
+    // checker. It must be dropped before `root_placed`.
     focus_handler: ReactCell<S::React, Option<RunFocusInteractionHandler<'static, S>>>,
-    // NOTE: `root_inst` may contain references to `root_widget` and `inner` that are hidden from
+    // NOTE: `root_placed` may contain references to `root_widget` and `inner` that are hidden from
     // the borrow checker.  It must be dropped before they are dropped.
-    root_inst: Rc<dyn WidgetInst<RunEnv<S>> + 'a>,
+    root_placed: Rc<dyn WidgetPlaced<RunEnv<S>> + 'a>,
     root_widget: Rc<DynWidget<'a, RunEnv<S>>>,
     // NOTE: `surface` may contain references to `inner` that are hidden from the borrow checker.
     // It must be dropped before `inner` is dropped.
@@ -163,15 +163,15 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
             });
         }
 
-        // Instantiate widget
+        // Place widget
         let mut raw_env = RawRunEnv {
             state: &mut *state,
             runner: &*self,
         };
         let env = RunEnv::from_raw_mut(&mut raw_env);
         inner.size.set(env, size);
-        let root_inst = Rc::new(root_widget.inst(env, inner.clone()));
-        let root_inst: Rc<dyn WidgetInst<RunEnv<S>> + '_> = root_inst;
+        let root_placed = Rc::new(root_widget.place(env, inner.clone()));
+        let root_placed: Rc<dyn WidgetPlaced<RunEnv<S>> + '_> = root_placed;
 
         // Configure surface
         let config = wgpu::SurfaceConfiguration {
@@ -188,7 +188,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
 
         // Extend the lifetimes for references within the `RunnerWindow`
         let surface: wgpu::Surface<'static> = unsafe { std::mem::transmute(surface) };
-        let root_inst: Rc<dyn WidgetInst<RunEnv<S>>> = unsafe { std::mem::transmute(root_inst) };
+        let root_placed: Rc<dyn WidgetPlaced<RunEnv<S>>> = unsafe { std::mem::transmute(root_placed) };
 
         // Add window to map
         Ok(&self
@@ -198,7 +198,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
                 cursor_handler: state.react().new_cell(None),
                 cursor_pos: state.react().new_cell(None),
                 focus_handler: state.react().new_cell(None),
-                root_inst,
+                root_placed,
                 root_widget,
                 surface,
                 config: RefCell::new(config),
@@ -247,7 +247,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
             winit::event::WindowEvent::Destroyed => todo!(),
             winit::event::WindowEvent::Focused(focused) => {
                 if *focused {
-                    if let Some(req) = window.root_inst.focus(
+                    if let Some(req) = window.root_placed.focus(
                         RunEnv::from_raw_mut(&mut RawRunEnv {
                             state,
                             runner: &*self,
@@ -341,7 +341,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
                 };
                 wgpu.drawer_context
                     .draw_to(&mut resources, &view, |drawer| {
-                        window.root_inst.draw(
+                        window.root_placed.draw(
                             RunEnv::from_raw_ref(&RawRunEnv {
                                 state,
                                 runner: &*self,
@@ -384,7 +384,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
                 }
             }
         } else if let Some(pos) = window.cursor_pos.get(state) {
-            let res = window.root_inst.cursor_event(
+            let res = window.root_placed.cursor_event(
                 RunEnv::from_raw_mut(&mut RawRunEnv {
                     state,
                     runner: self,
@@ -585,7 +585,7 @@ impl<S: HasReact + Track> WidgetEnvironment for RunEnv<S> {
             });
             if is_hovering {
                 if let Some(pos) = window.cursor_pos.get(self) {
-                    window.root_inst.hover_feedback(self, pos, f);
+                    window.root_placed.hover_feedback(self, pos, f);
                 }
             }
         }

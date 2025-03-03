@@ -26,14 +26,25 @@ pub struct Overlay<Below, Above> {
 }
 
 /// Constructs a [`Widget`] which overlays one widget above another in the same layout rectangle.
-pub fn overlay<Below: WidgetBase, Above: WidgetBase>(
+pub fn overlay<Below: WidgetLike, Above: WidgetLike>(
     below: Below,
     above: Above,
 ) -> Overlay<Below, Above> {
     Overlay { below, above }
 }
 
-impl<Below: WidgetBase, Above: WidgetBase> WidgetBase for Overlay<Below, Above> {}
+impl<Below: WidgetLike, Above: WidgetLike> WidgetLike for Overlay<Below, Above> {}
+
+impl<Env: WidgetEnvironment + ?Sized, Below: IntoWidget<Env>, Above: IntoWidget<Env>>
+    IntoWidget<Env> for Overlay<Below, Above>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        Overlay {
+            below: self.below.into_widget(env),
+            above: self.above.into_widget(env),
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, Below: Widget<Env>, Above: Widget<Env>> Widget<Env>
     for Overlay<Below, Above>
@@ -42,25 +53,29 @@ impl<Env: WidgetEnvironment + ?Sized, Below: Widget<Env>, Above: Widget<Env>> Wi
         &self.below.sizing(env) & &self.above.sizing(env)
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        OverlayInst {
-            below: self.below.inst(env, slot.clone()),
-            above: self.above.inst(env, slot),
+        OverlayPlaced {
+            below: self.below.place(env, slot.clone()),
+            above: self.above.place(env, slot),
         }
     }
 }
 
-/// A [`WidgetInst`] for an [`Overlay`] widget.
-struct OverlayInst<Below, Above> {
+/// An [`Overlay`] widget which has been placed in a [`WidgetSlot`].
+struct OverlayPlaced<Below, Above> {
     below: Below,
     above: Above,
 }
 
-impl<Env: WidgetEnvironment + ?Sized, Below: WidgetInst<Env>, Above: WidgetInst<Env>>
-    WidgetInst<Env> for OverlayInst<Below, Above>
+impl<Env: WidgetEnvironment + ?Sized, Below: WidgetPlaced<Env>, Above: WidgetPlaced<Env>>
+    WidgetPlaced<Env> for OverlayPlaced<Below, Above>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.below.draw(env, drawer);

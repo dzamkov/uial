@@ -124,10 +124,10 @@ pub struct ZoomCanvas<
 }
 
 impl<
-        Env: WidgetEnvironment + ?Sized,
-        C: Field<Env, Value = Camera>,
-        F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
-    > ZoomCanvas<Env, C, F>
+    Env: WidgetEnvironment + ?Sized,
+    C: Field<Env, Value = Camera>,
+    F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+> ZoomCanvas<Env, C, F>
 {
     /// Constructs a new [`ZoomCanvas`] widget.
     pub fn new(camera: C, draw: F) -> Self {
@@ -153,33 +153,44 @@ pub fn zoom_canvas<
 }
 
 impl<
-        Env: WidgetEnvironment + ?Sized,
-        C: PropertyBase<Value = Camera>,
-        F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
-    > WidgetBase for ZoomCanvas<Env, C, F>
+    Env: WidgetEnvironment + ?Sized,
+    C: PropertyBase<Value = Camera>,
+    F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+> WidgetLike for ZoomCanvas<Env, C, F>
 {
 }
 
 impl<
-        Env: WidgetEnvironment + ?Sized,
-        C: Field<Env, Value = Camera>,
-        F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
-    > Widget<Env> for ZoomCanvas<Env, C, F>
+    Env: WidgetEnvironment + ?Sized,
+    C: Field<Env, Value = Camera>,
+    F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+> IntoWidget<Env> for ZoomCanvas<Env, C, F>
+{
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
+
+impl<
+    Env: WidgetEnvironment + ?Sized,
+    C: Field<Env, Value = Camera>,
+    F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+> Widget<Env> for ZoomCanvas<Env, C, F>
 {
     fn sizing(&self, _: &Env) -> Sizing {
         Sizing::any()
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        ZoomCanvasInst { widget: self, slot }
+        ZoomCanvasPlaced { widget: self, slot }
     }
 }
 
-/// An instance of a [`ZoomCanvas`] widget.
-pub struct ZoomCanvasInst<
+/// A [`ZoomCanvas`] widget which has been placed in a [`WidgetSlot`].
+pub struct ZoomCanvasPlaced<
     'a,
     Env: WidgetEnvironment + ?Sized,
     C: PropertyBase<Value = Camera>,
@@ -191,11 +202,11 @@ pub struct ZoomCanvasInst<
 }
 
 impl<
-        Env: WidgetEnvironment + ?Sized,
-        C: Field<Env, Value = Camera>,
-        F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
-        Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for ZoomCanvasInst<'_, Env, C, F, Slot>
+    Env: WidgetEnvironment + ?Sized,
+    C: Field<Env, Value = Camera>,
+    F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
+    Slot: WidgetSlot<Env>,
+> WidgetPlaced<Env> for ZoomCanvasPlaced<'_, Env, C, F, Slot>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         let mut proj = self.widget.camera.get(env).projection();

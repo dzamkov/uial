@@ -24,7 +24,18 @@ impl<T, F> OnClick<T, F> {
     }
 }
 
-impl<T: WidgetBase, F> WidgetBase for OnClick<T, F> {}
+impl<T: WidgetLike, F> WidgetLike for OnClick<T, F> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env>, F: Fn(&mut Env)> IntoWidget<Env>
+    for OnClick<T, F>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        OnClick {
+            inner: self.inner.into_widget(env),
+            on_click: self.on_click,
+        }
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, F: Fn(&mut Env)> Widget<Env>
     for OnClick<T, F>
@@ -33,27 +44,31 @@ impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env>, F: Fn(&mut Env)> Widget<En
         self.inner.sizing(env)
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        OnClickInst {
+        OnClickPlaced {
             handler: &self.on_click,
             slot: slot.clone(),
-            inner: self.inner.inst(env, slot),
+            inner: self.inner.place(env, slot),
         }
     }
 }
 
-/// A [`WidgetInst`] for an [`OnClick`] widget.
-struct OnClickInst<'a, F, S, T> {
+/// An [`OnClick`] widget which has been placed in a [`WidgetSlot`].
+struct OnClickPlaced<'a, F, S, T> {
     handler: &'a F,
     slot: S,
     inner: T,
 }
 
-impl<Env: WidgetEnvironment + ?Sized, F: Fn(&mut Env), S: WidgetSlot<Env>, T: WidgetInst<Env>>
-    WidgetInst<Env> for OnClickInst<'_, F, S, T>
+impl<Env: WidgetEnvironment + ?Sized, F: Fn(&mut Env), S: WidgetSlot<Env>, T: WidgetPlaced<Env>>
+    WidgetPlaced<Env> for OnClickPlaced<'_, F, S, T>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.inner.draw(env, drawer)
@@ -101,12 +116,12 @@ impl<Env: WidgetEnvironment + ?Sized, F: Fn(&mut Env), S: WidgetSlot<Env>, T: Wi
 }
 
 impl<
-        'ui,
-        Env: WidgetEnvironment + ?Sized,
-        F: Fn(&mut Env),
-        S: WidgetSlot<Env>,
-        T: WidgetInst<Env>,
-    > CursorInteractionHandler<'ui, Env> for OnClickInst<'_, F, S, T>
+    'ui,
+    Env: WidgetEnvironment + ?Sized,
+    F: Fn(&mut Env),
+    S: WidgetSlot<Env>,
+    T: WidgetPlaced<Env>,
+> CursorInteractionHandler<'ui, Env> for OnClickPlaced<'_, F, S, T>
 {
     fn is_locked(&self, _: &Env) -> bool {
         true

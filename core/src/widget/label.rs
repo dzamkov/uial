@@ -23,11 +23,8 @@ pub struct Label<
     text_buffer_cache: Cache<Env, (Size2i, TextBuffer<<F::Value as FontBase>::Glyph>)>,
 }
 
-impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        F: Property<Env>,
-        T: Property<Env, Value = String>,
-    > Label<Env, F, T>
+impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
+    Label<Env, F, T>
 where
     Env::Drawer: RasterDrawer,
     F::Value: Font<Env::Drawer>,
@@ -99,11 +96,8 @@ where
     }
 }
 
-impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        F: Property<Env>,
-        T: Property<Env, Value = String>,
-    > WidgetBase for Label<Env, F, T>
+impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
+    WidgetLike for Label<Env, F, T>
 where
     Env::Drawer: RasterDrawer,
     F::Value: Font<Env::Drawer>,
@@ -111,11 +105,20 @@ where
 {
 }
 
-impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        F: Property<Env>,
-        T: Property<Env, Value = String>,
-    > Widget<Env> for Label<Env, F, T>
+impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
+    IntoWidget<Env> for Label<Env, F, T>
+where
+    Env::Drawer: RasterDrawer,
+    F::Value: Font<Env::Drawer>,
+    <F::Value as FontBase>::Glyph: Sized,
+{
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
+
+impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
+    Widget<Env> for Label<Env, F, T>
 where
     Env::Drawer: RasterDrawer,
     F::Value: Font<Env::Drawer>,
@@ -125,16 +128,16 @@ where
         self.with_text_buffer(env, |size, _| Sizing::exact(size))
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        LabelInst { widget: self, slot }
+        LabelPlaced { widget: self, slot }
     }
 }
 
-/// An instance of a [`Label`] widget.
-struct LabelInst<
+/// A [`Label`] widget which has been placed in a [`WidgetSlot`].
+struct LabelPlaced<
     'a,
     Env: WidgetEnvironment + Track + ?Sized,
     F: Property<Env>,
@@ -150,11 +153,11 @@ struct LabelInst<
 }
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        F: Property<Env>,
-        T: Property<Env, Value = String>,
-        Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for LabelInst<'_, Env, F, T, Slot>
+    Env: WidgetEnvironment + Track + ?Sized,
+    F: Property<Env>,
+    T: Property<Env, Value = String>,
+    Slot: WidgetSlot<Env>,
+> WidgetPlaced<Env> for LabelPlaced<'_, Env, F, T, Slot>
 where
     Env::Drawer: RasterDrawer,
     F::Value: Font<Env::Drawer>,

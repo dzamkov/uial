@@ -34,22 +34,48 @@ use std::rc::Rc;
 pub use switch::*;
 pub use zoom_canvas::*;
 
-/// A trait which all [`Widget`]s must implement.
+/// A widget-like object to which widget decorators and composition operators can be applied.
 ///
-/// This is used primarily for defining functions and methods which compose [`Widget`]s, without
-/// regard to their specific [`WidgetEnvironment`].
-pub trait WidgetBase {}
+/// All [`Widget`]s and [`IntoWidget`]s, for any [`WidgetEnvironment`], are [`WidgetLike`].
+pub trait WidgetLike {}
 
-/// Describes an interactive UI component that is displayed within a rectangle in discrete
-/// two-dimensional space. `Env` encapsulates the external data and/or resources that the
-/// widget has access to.
-pub trait Widget<Env: WidgetEnvironment + ?Sized>: WidgetBase {
+/// Can be converted into a [`Widget`].
+///
+/// This is trivially implemented for all [`Widget`]s, but may also be implemented for static
+/// descriptions of a widget (i.e. a widget builder), and references to them. In the latter
+/// each call to [`IntoWidget::into_widget`] should yield a new instance of the widget which
+/// is entirely independent of the previous instances.
+///
+/// There is no blanket implementation for [`Widget`] because some decorators and composition
+/// operators should implement [`IntoWidget`] manually.
+pub trait IntoWidget<Env: WidgetEnvironment + ?Sized>: WidgetLike {
+    /// Converts this [`IntoWidget`] into a [`Widget`].
+    fn into_widget(self, env: &Env) -> impl Widget<Env>
+    where
+        Self: Sized;
+}
+
+/// Describes an interactive UI component that can be displayed within a rectangle in discrete
+/// two-dimensional space.
+///
+/// When a [`Widget`] is [`Clone`], cloning it will yield an identical [`Widget`] with shared
+/// internal state and identity. e.g. a cloned button will appear to be highlighted and pressed
+/// when the original button is highlighted and pressed. This is occasionally useful when there
+/// is a need to define different views/layouts of the same set of widgets. However, in the case
+/// where multiple independent widgets are desired, you should instead make multiple calls to
+/// [`IntoWidget::into_widget`] of a static description of the widget.
+///
+/// `Env` encapsulates the external data and/or resources that the widget has access to.
+pub trait Widget<Env: WidgetEnvironment + ?Sized>: IntoWidget<Env> {
     /// Gets the sizing preferences/constraints for this [`Widget`].
     fn sizing(&self, env: &Env) -> Sizing;
 
-    // TODO: Add `env` parameter once precise capturing has been implemented in rust.
-    /// Creates an instance of this [`Widget`] within the given slot.
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    /// Creates an instance of this [`Widget`] placed in the given slot.
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a;
 
@@ -62,7 +88,7 @@ pub trait Widget<Env: WidgetEnvironment + ?Sized>: WidgetBase {
     }
 }
 
-/// Represents a location within a UI layout where a [`Widget`] may be instantiated.
+/// Represents a location within a UI layout where a [`Widget`] may be placed.
 pub trait WidgetSlot<Env: WidgetEnvironment + ?Sized>: Clone {
     /// Indicates whether the widget in this slot is part of the current layout.
     fn is_visible(&self, env: &Env) -> bool;
@@ -85,8 +111,9 @@ pub trait WidgetSlot<Env: WidgetEnvironment + ?Sized>: Clone {
     fn bubble_general_event(&self, env: &mut Env, event: GeneralEvent);
 }
 
-/// A [`Widget`] which has been instantiated into a particular place within a UI layout.
-pub trait WidgetInst<Env: WidgetEnvironment + ?Sized> {
+/// Encapsulates the functionality of a [`Widget`] when it is "placed" into a particular
+/// [`WidgetSlot`].
+pub trait WidgetPlaced<Env: WidgetEnvironment + ?Sized> {
     /// Draws this [`WidgetInst`] to the given drawer.
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer);
 
@@ -115,7 +142,7 @@ pub trait WidgetInst<Env: WidgetEnvironment + ?Sized> {
     fn focus(&self, env: &mut Env, backward: bool) -> Option<FocusInteractionRequest<Env>>;
 
     /// Converts this [`WidgetInst`] into a [`Rc`]-wrapped dynamic [`WidgetInst`].
-    fn into_rc_dyn<'a>(self) -> Rc<dyn WidgetInst<Env> + 'a>
+    fn into_rc_dyn<'a>(self) -> Rc<dyn WidgetPlaced<Env> + 'a>
     where
         Self: Sized + 'a,
     {
@@ -149,22 +176,32 @@ pub trait WidgetEnvironment {
     fn interaction_feedback(&self, f: &mut dyn FnMut(&dyn Any));
 }
 
-impl<T: WidgetBase + ?Sized> WidgetBase for Rc<T> {}
+impl<T: WidgetLike + ?Sized> WidgetLike for Rc<T> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env> + ?Sized> IntoWidget<Env> for Rc<T> {
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self.clone()
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env> + ?Sized> Widget<Env> for Rc<T> {
     fn sizing(&self, env: &Env) -> Sizing {
         (**self).sizing(env)
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        (**self).inst(env, slot)
+        (**self).place(env, slot)
     }
 }
 
-impl<Env: WidgetEnvironment + ?Sized, T: WidgetInst<Env> + ?Sized> WidgetInst<Env> for Rc<T> {
+impl<Env: WidgetEnvironment + ?Sized, T: WidgetPlaced<Env> + ?Sized> WidgetPlaced<Env> for Rc<T> {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         (**self).draw(env, drawer)
     }
@@ -191,6 +228,9 @@ impl<Env: WidgetEnvironment + ?Sized, T: WidgetInst<Env> + ?Sized> WidgetInst<En
 ///
 /// Only certain widgets will have an [`WidgetId`], usually when it is necessary to identify it
 /// within a [`WidgetEnvironment`].
+///
+/// Cloning a [`Widget`] will not create a new [`WidgetId`]. However, calling
+/// [`IntoWidget::into_widget`] on a static description of a widget will.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WidgetId(Unique);
 

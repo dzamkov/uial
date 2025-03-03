@@ -103,7 +103,16 @@ pub fn button<'a, Env: WidgetEnvironment + HasImageManager + ?Sized>(
     Button::new(style, const_(true).into(), Box::new(on_click))
 }
 
-impl<Env: WidgetEnvironment + HasImageManager + ?Sized> WidgetBase for Button<'_, Env> {}
+impl<Env: WidgetEnvironment + HasImageManager + ?Sized> WidgetLike for Button<'_, Env> {}
+
+impl<Env: WidgetEnvironment + HasImageManager + ?Sized> IntoWidget<Env> for Button<'_, Env>
+where
+    Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,
+{
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
 
 impl<Env: WidgetEnvironment + HasImageManager + ?Sized> Widget<Env> for Button<'_, Env>
 where
@@ -124,7 +133,7 @@ where
         Sizing::minimum(min)
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
@@ -138,7 +147,7 @@ struct ButtonInst<'a, Env: WidgetEnvironment + HasImageManager + ?Sized, Slot> {
     slot: Slot,
 }
 
-impl<Env: WidgetEnvironment + HasImageManager + ?Sized, Slot: WidgetSlot<Env>> WidgetInst<Env>
+impl<Env: WidgetEnvironment + HasImageManager + ?Sized, Slot: WidgetSlot<Env>> WidgetPlaced<Env>
     for ButtonInst<'_, Env, Slot>
 where
     Env::Drawer: ImageDrawer<<Env::ImageManager as ImageManager>::Source>,

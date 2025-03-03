@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::RationalU32;
+use crate::prelude::*;
 use std::any::Any;
 use std::rc::Rc;
 
@@ -89,14 +89,26 @@ impl<A, B, const VERTICAL: bool> Stack<A, B, VERTICAL> {
     }
 }
 
-impl<A: WidgetBase, B: WidgetBase, const VERTICAL: bool> WidgetBase for Stack<A, B, VERTICAL> {}
+impl<A: WidgetLike, B: WidgetLike, const VERTICAL: bool> WidgetLike for Stack<A, B, VERTICAL> {}
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        A: Widget<Env>,
-        B: Widget<Env>,
-        const VERTICAL: bool,
-    > Widget<Env> for Stack<A, B, VERTICAL>
+    Env: WidgetEnvironment + Track + ?Sized,
+    A: IntoWidget<Env>,
+    B: IntoWidget<Env>,
+    const VERTICAL: bool,
+> IntoWidget<Env> for Stack<A, B, VERTICAL>
+{
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        Stack::<_, _, VERTICAL> {
+            a: self.a.into_widget(env),
+            b: self.b.into_widget(env),
+            split: self.split,
+        }
+    }
+}
+
+impl<Env: WidgetEnvironment + Track + ?Sized, A: Widget<Env>, B: Widget<Env>, const VERTICAL: bool>
+    Widget<Env> for Stack<A, B, VERTICAL>
 {
     fn sizing(&self, env: &Env) -> Sizing {
         let sizing_a = self.a.sizing(env);
@@ -108,7 +120,11 @@ impl<
         }
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, env: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(
+        &'a self,
+        env: &Env,
+        slot: S,
+    ) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
@@ -119,13 +135,13 @@ impl<
             layout_cache: Cache::new(),
             slot,
         });
-        StackInst {
+        StackPlaced {
             a: self
                 .a
-                .inst(env, StackSlot::<_, _, VERTICAL, false>(shared.clone())),
+                .place(env, StackSlot::<_, _, VERTICAL, false>(shared.clone())),
             b: self
                 .b
-                .inst(env, StackSlot::<_, _, VERTICAL, true>(shared.clone())),
+                .place(env, StackSlot::<_, _, VERTICAL, true>(shared.clone())),
             shared,
         }
     }
@@ -186,11 +202,11 @@ struct StackSlot<
 >(Rc<StackShared<'a, Env, S, VERTICAL>>);
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        S: WidgetSlot<Env>,
-        const VERTICAL: bool,
-        const SIDE: bool,
-    > Clone for StackSlot<'_, Env, S, VERTICAL, SIDE>
+    Env: WidgetEnvironment + Track + ?Sized,
+    S: WidgetSlot<Env>,
+    const VERTICAL: bool,
+    const SIDE: bool,
+> Clone for StackSlot<'_, Env, S, VERTICAL, SIDE>
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -198,11 +214,11 @@ impl<
 }
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        S: WidgetSlot<Env>,
-        const VERTICAL: bool,
-        const SIDE: bool,
-    > WidgetSlot<Env> for StackSlot<'_, Env, S, VERTICAL, SIDE>
+    Env: WidgetEnvironment + Track + ?Sized,
+    S: WidgetSlot<Env>,
+    const VERTICAL: bool,
+    const SIDE: bool,
+> WidgetSlot<Env> for StackSlot<'_, Env, S, VERTICAL, SIDE>
 {
     fn is_visible(&self, env: &Env) -> bool {
         self.0.slot.is_visible(env)
@@ -241,20 +257,20 @@ impl<
     }
 }
 
-/// A [`WidgetInst`] for a [`Stack`] widget.
-struct StackInst<'a, Env: WidgetEnvironment + Track + ?Sized, S, A, B, const VERTICAL: bool> {
+/// A [`Stack`] widget which has been placed in a [`WidgetSlot`].
+struct StackPlaced<'a, Env: WidgetEnvironment + Track + ?Sized, S, A, B, const VERTICAL: bool> {
     shared: Rc<StackShared<'a, Env, S, VERTICAL>>,
     a: A,
     b: B,
 }
 
 impl<
-        Env: WidgetEnvironment + Track + ?Sized,
-        S: WidgetSlot<Env>,
-        A: WidgetInst<Env>,
-        B: WidgetInst<Env>,
-        const VERTICAL: bool,
-    > WidgetInst<Env> for StackInst<'_, Env, S, A, B, VERTICAL>
+    Env: WidgetEnvironment + Track + ?Sized,
+    S: WidgetSlot<Env>,
+    A: WidgetPlaced<Env>,
+    B: WidgetPlaced<Env>,
+    const VERTICAL: bool,
+> WidgetPlaced<Env> for StackPlaced<'_, Env, S, A, B, VERTICAL>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         self.a.draw(env, drawer);

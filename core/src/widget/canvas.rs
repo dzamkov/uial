@@ -25,7 +25,15 @@ pub fn canvas<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Dra
     Canvas::new(draw)
 }
 
-impl<Env: ?Sized, F> WidgetBase for Canvas<Env, F> {}
+impl<Env: ?Sized, F> WidgetLike for Canvas<Env, F> {}
+
+impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer)> IntoWidget<Env>
+    for Canvas<Env, F>
+{
+    fn into_widget(self, _: &Env) -> impl Widget<Env> {
+        self
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer)> Widget<Env>
     for Canvas<Env, F>
@@ -34,25 +42,22 @@ impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer)> Wid
         Sizing::any()
     }
 
-    fn inst<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetInst<Env> + 'a
+    fn place<'a, S: WidgetSlot<Env> + 'a>(&'a self, _: &Env, slot: S) -> impl WidgetPlaced<Env> + 'a
     where
         Env: 'a,
     {
-        CanvasInst { widget: self, slot }
+        CanvasPlaced { widget: self, slot }
     }
 }
 
-/// An instance of a [`Canvas`] widget.
-struct CanvasInst<'a, Env: WidgetEnvironment + ?Sized, F, Slot> {
+/// A [`Canvas`] widget which has been placed in a [`WidgetSlot`].
+struct CanvasPlaced<'a, Env: WidgetEnvironment + ?Sized, F, Slot> {
     widget: &'a Canvas<Env, F>,
     slot: Slot,
 }
 
-impl<
-        Env: WidgetEnvironment + ?Sized,
-        F: Fn(&Env, Size2i, &mut Env::Drawer),
-        Slot: WidgetSlot<Env>,
-    > WidgetInst<Env> for CanvasInst<'_, Env, F, Slot>
+impl<Env: WidgetEnvironment + ?Sized, F: Fn(&Env, Size2i, &mut Env::Drawer), Slot: WidgetSlot<Env>>
+    WidgetPlaced<Env> for CanvasPlaced<'_, Env, F, Slot>
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         // TODO: Translate the drawer to the slot's minimum corner
