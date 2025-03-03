@@ -50,9 +50,23 @@ pub trait WidgetLike {}
 /// operators should implement [`IntoWidget`] manually.
 pub trait IntoWidget<Env: WidgetEnvironment + ?Sized>: WidgetLike {
     /// Converts this [`IntoWidget`] into a [`Widget`].
+    // TODO: The return type should not capture the lifetime associated with `env`, but there
+    // is no way to express this for now.
+    // Fix once https://github.com/rust-lang/rust/issues/130044 is stablized
     fn into_widget(self, env: &Env) -> impl Widget<Env>
     where
         Self: Sized;
+}
+
+/// Shortcut for [`IntoWidget::into_widget`].
+// TODO: This is a hack to work around https://github.com/rust-lang/rust/issues/130044
+// once this is stablized, we can remove the entire function
+pub fn into_widget<Env: WidgetEnvironment + ?Sized + 'static, T: IntoWidget<Env>>(
+    widget: T,
+    env: &Env,
+) -> impl Widget<Env> + use<T, Env> {
+    let env: &'static Env = unsafe { std::mem::transmute(env) };
+    widget.into_widget(env)
 }
 
 /// Describes an interactive UI component that can be displayed within a rectangle in discrete
