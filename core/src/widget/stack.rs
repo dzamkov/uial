@@ -57,6 +57,7 @@ impl<T> Weighted<T> {
 
 /// A [`Widget`] which combines two source [`Widget`]s by stacking them either horizontally or
 /// vertically.
+#[derive(Clone, Copy)]
 pub struct Stack<A, B, const VERTICAL: bool> {
     a: A,
     b: B,

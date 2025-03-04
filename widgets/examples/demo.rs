@@ -5,7 +5,7 @@ use uial_widgets::prelude::*;
 fn main() {
     run(|_| SimpleApp {
         title: "Widgets Demo",
-        body: &|env| {
+        body: widget::build(|env: &DefaultEnv| {
             let style = uial_widgets::load_default_style(env);
             let is_enabled = Rc::new(env.react().new_cell(true));
             let widget = stack_h![
@@ -22,6 +22,6 @@ fn main() {
             .minimize()
             .center();
             widget::into_widget(widget, env).into_rc_dyn()
-        },
+        }),
     })
 }

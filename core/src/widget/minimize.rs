@@ -29,6 +29,7 @@ pub type MinimizeH<T> = Minimize<T, false>;
 pub type MinimizeV<T> = Minimize<T, true>;
 
 /// A wrapper over a [`Widget`] which forces its size to be minimized along some axis.
+#[derive(Clone, Copy)]
 pub struct Minimize<T, const VERTICAL: bool> {
     inner: T,
 }

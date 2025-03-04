@@ -11,6 +11,7 @@ pub trait PadWidgetExt: WidgetLike + Sized {
 impl<T: WidgetLike> PadWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which surroundings it with a specified amount of padding.
+#[derive(Clone, Copy)]
 pub struct Pad<T> {
     inner: T,
     amount: Padding2i,

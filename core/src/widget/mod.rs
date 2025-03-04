@@ -1,3 +1,4 @@
+mod build;
 mod canvas;
 mod dynamic;
 mod empty;
@@ -16,6 +17,7 @@ mod zoom_canvas;
 
 use crate::prelude::*;
 use crate::unique::Unique;
+pub use build::*;
 pub use canvas::*;
 pub use dynamic::*;
 pub use empty::*;
@@ -190,7 +192,15 @@ pub trait WidgetEnvironment {
     fn interaction_feedback(&self, f: &mut dyn FnMut(&dyn Any));
 }
 
+impl<T: WidgetLike + ?Sized> WidgetLike for &'_ T {}
+
 impl<T: WidgetLike + ?Sized> WidgetLike for Rc<T> {}
+
+impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env> + Clone> IntoWidget<Env> for &'_ T {
+    fn into_widget(self, env: &Env) -> impl Widget<Env> {
+        self.clone().into_widget(env)
+    }
+}
 
 impl<Env: WidgetEnvironment + ?Sized, T: Widget<Env> + ?Sized> IntoWidget<Env> for Rc<T> {
     fn into_widget(self, _: &Env) -> impl Widget<Env> {

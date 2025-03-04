@@ -6,7 +6,7 @@ use uial_backend::*;
 fn main() {
     run(|_| SimpleApp {
         title: "Canvas example",
-        body: &|env| {
+        body: widget::build(|env: &DefaultEnv| {
             let image_manager = env.image_manager();
             let font_data = include_bytes!("font.ttf")[..].to_owned().into_boxed_slice();
             let font_family = ImageTTFontFamily::new(font_data, image_manager.clone()).unwrap();
@@ -75,7 +75,6 @@ fn main() {
             .on_click(move |env| {
                 num_clicks.set(env, num_clicks.get(env) + 1);
             })
-            .into_rc_dyn()
-        },
+        }),
     });
 }

@@ -20,6 +20,7 @@ macro_rules! overlay {
 
 /// A [`Widget`] which combines two source [`Widget`]s in the same layout rectangle, overlaying
 /// one on top of the other.
+#[derive(Clone, Copy)]
 pub struct Overlay<Below, Above> {
     below: Below,
     above: Above,

@@ -38,7 +38,7 @@ fn main() {
     ];
     run(|_| SimpleApp {
         title: "Circles",
-        body: &|env| {
+        body: widget::build(|env: &DefaultEnv| {
             let camera = Rc::new(env.react().new_cell(Trajectory::new(
                 Instant::ZERO,
                 Camera::new(vec2(0.0, 0.0), 5.0, -8.0),
@@ -57,7 +57,6 @@ fn main() {
                 }
                 _ => false,
             })
-            .into_rc_dyn()
-        },
+        }),
     })
 }

@@ -40,6 +40,7 @@ impl<T: WidgetLike> ExtendWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which extends it horizontally or vertically by applying a
 /// variable amount of padding on either side.
+#[derive(Clone, Copy)]
 pub struct Extend<T, const VERTICAL: bool> {
     inner: T,
     align: RationalU32,

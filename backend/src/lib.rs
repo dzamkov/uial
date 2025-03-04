@@ -45,22 +45,22 @@ pub trait SimpleApplication<Env: ?Sized + WidgetEnvironment> {
     }
 }
 
-/// An implementation of [`SimpleApplication`] using dynamic dispatch.
-pub struct SimpleApp<'a> {
+/// A minimal implementation of [`SimpleApplication`].
+pub struct SimpleApp<'a, Body> {
     /// The title of the application window.
     pub title: &'a str,
 
     /// The body of the application window.
-    pub body: &'a dyn Fn(&DefaultEnv) -> Rc<DynWidget<'a, DefaultEnv>>,
+    pub body: Body,
 }
 
-impl SimpleApplication<DefaultEnv> for SimpleApp<'_> {
+impl<Body: IntoWidget<DefaultEnv> + Clone> SimpleApplication<DefaultEnv> for SimpleApp<'_, Body> {
     fn title(&self, _: &DefaultEnv) -> &str {
         self.title
     }
 
     fn body(&self, env: &DefaultEnv) -> Rc<DynWidget<'_, DefaultEnv>> {
-        (self.body)(env)
+        widget::into_widget(&self.body, env).into_rc_dyn()
     }
 }
 

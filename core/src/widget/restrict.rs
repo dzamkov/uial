@@ -100,6 +100,7 @@ pub trait RestrictWidgetExt: WidgetLike + Sized {
 impl<T: WidgetLike> RestrictWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which restricts the possible sizes it can be instantiated with.
+#[derive(Clone, Copy)]
 pub struct Restrict<T: WidgetLike, S: PropertyBase<Value = Sizing>> {
     inner: T,
     sizing: S,

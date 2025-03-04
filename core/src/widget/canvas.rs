@@ -3,6 +3,7 @@ use std::any::Any;
 use std::marker::PhantomData;
 
 /// A non-interactive [`Widget`] which is drawn using a custom closure.
+#[derive(Clone, Copy)]
 pub struct Canvas<Env: ?Sized, F> {
     _marker: PhantomData<fn(&Env)>,
     draw: F,

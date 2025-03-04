@@ -3,6 +3,7 @@ use std::any::Any;
 
 /// A completely transparent and uninteractive [`Widget`] that occupies a variable amount of
 /// space.
+#[derive(Clone, Copy)]
 pub struct Empty;
 
 /// Get a [`Widget`] that is completely transparent and uninteractive, typically used to fill

@@ -3,6 +3,7 @@ use crate::prelude::*;
 use std::any::Any;
 
 /// A [`Widget`] that displays as a simple filled rectangle.
+#[derive(Clone, Copy)]
 pub struct Fill {
     pub paint: Paint,
 }
