@@ -1,16 +1,18 @@
 pub mod renege;
-pub mod version;
+mod prop;
+mod cache;
 
-use super::prop::*;
-use super::Track;
+pub use prop::*;
+pub use cache::*;
 
 /// The preferred implementation of [`React`].
 pub type DefaultReact = renege::RenegeReact<'static>;
 
-/// Represents an extensible store of state information. More concretely, this allows the creation
-/// of [`ReactCell`]s and controls access to their contents, similar to how
-/// [`GhostCell`](https://plv.mpi-sws.org/rustbelt/ghostcell/) works. A type that implements
-/// both [`React`] and [`Track`] can be viewed as a minimal
+/// Represents an extensible store of state information.
+/// 
+/// More concretely, this allows the creation of [`ReactCell`]s and controls access to their
+/// contents, similar to how [`GhostCell`](https://plv.mpi-sws.org/rustbelt/ghostcell/) works.
+/// A type that implements both [`React`] and [`Track`] can be viewed as a minimal
 /// [FRP](https://en.wikipedia.org/wiki/Functional_reactive_programming) implementation with
 /// automatic cache invalidation when state information changes.
 pub trait React {

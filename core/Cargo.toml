@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+uial-react = { path = "../react" }
 diffgeom = { git = "https://github.com/dzamkov/diffgeom", features = ["bytemuck"] }
-renege = "0.1"
 derive_more = { version = "1", features = ["full"] }
 winit = "0.30"
 palette = "0.7"
@@ -13,7 +13,6 @@ image = "0.25"
 guillotiere = "0.6"
 ttf-parser = "0.25"
 ab_glyph_rasterizer = "0.1"
-ghost-cell = "0.2"
 rand = "0.9"
 num-rational = { version = "0.4", default-features = false }
 

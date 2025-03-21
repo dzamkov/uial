@@ -1,0 +1,8 @@
+[package]
+name = "uial-react"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+renege = "0.3"
+ghost-cell = "0.2"

@@ -1176,7 +1176,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -2141,9 +2141,9 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "renege"
-version = "0.1.2"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a5d7174e3a177d044f19ba6ca6e3ace1c9ed4fc43908ed04724aba399e2f778"
+checksum = "500f061d18f1f607a07fd75ea119c2bed3150939226f65ecadc01581a6893f2b"
 
 [[package]]
 name = "rgb"
@@ -2563,15 +2563,14 @@ dependencies = [
  "approx",
  "derive_more 1.0.0",
  "diffgeom",
- "ghost-cell",
  "guillotiere",
  "image",
  "num-rational",
  "palette",
  "rand 0.9.0",
- "renege",
  "ttf-parser",
  "uial-backend",
+ "uial-react",
  "winit",
 ]
 
@@ -2588,6 +2587,14 @@ dependencies = [
  "uial",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "uial-react"
+version = "0.1.0"
+dependencies = [
+ "ghost-cell",
+ "renege",
 ]
 
 [[package]]
