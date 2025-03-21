@@ -1,27 +1,16 @@
-use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 
-/// Identifies a value of a certain type which can be obtained from an "environment". See
-/// [`Property`].
-pub trait PropertyBase {
+/// Identifies a value of type `Self::Value` which can be obtained from an "environment"
+/// of an unspecified type.
+pub trait PropertyLike {
     /// The type of value for this property.
     type Value: ?Sized;
-
-    /// Constructs a property which "selects" a specific sub-field from this property.
-    fn select<F: Fn(&Self::Value) -> &T, T>(self, f: F) -> SelectProperty<Self, F>
-    where
-        Self: Sized,
-    {
-        SelectProperty {
-            source: self,
-            select: f,
-        }
-    }
 }
 
-/// Identifies a value of a certain type which can be obtained from an "environment" of type `Env`.
-pub trait Property<Env: ?Sized>: PropertyBase {
+/// Identifies a value of type `Self::Value` which can be obtained from an "environment" of type
+/// `Env`.
+pub trait Property<Env: ?Sized>: PropertyLike {
     /// Accesses the value of this property using the given closure.
     fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Self::Value) -> R) -> R;
 
@@ -34,7 +23,8 @@ pub trait Property<Env: ?Sized>: PropertyBase {
     }
 }
 
-/// Identifies a mutable value of type `T` which is stored in an `Env`.
+/// Identifies a mutable value of type `Self::Value` which is stored in an "environment" of type
+/// `Env`.
 pub trait Field<Env: ?Sized>: Property<Env> {
     /// Accesses the value of this field using the given closure.
     fn with_mut<R>(&self, env: &mut Env, inner: impl FnOnce(&mut Self::Value) -> R) -> R;
@@ -56,7 +46,7 @@ pub trait Field<Env: ?Sized>: Property<Env> {
     }
 }
 
-impl<T: PropertyBase> PropertyBase for &T {
+impl<T: PropertyLike> PropertyLike for &T {
     type Value = T::Value;
 }
 
@@ -72,7 +62,7 @@ impl<Env: ?Sized, T: Field<Env>> Field<Env> for &T {
     }
 }
 
-impl<T: PropertyBase> PropertyBase for Rc<T> {
+impl<T: PropertyLike> PropertyLike for Rc<T> {
     type Value = T::Value;
 }
 
@@ -88,7 +78,7 @@ impl<Env: ?Sized, T: Field<Env>> Field<Env> for Rc<T> {
     }
 }
 
-impl<T: PropertyBase> PropertyBase for Arc<T> {
+impl<T: PropertyLike> PropertyLike for Arc<T> {
     type Value = T::Value;
 }
 
@@ -105,15 +95,11 @@ impl<Env: ?Sized, T: Field<Env>> Field<Env> for Arc<T> {
 }
 
 /// A [`Property`] wrapper over a constant value.
+#[repr(transparent)]
 #[derive(Clone, Copy)]
 pub struct Const<T>(pub T);
 
-/// Shortcut for [`Const::new`].
-pub fn const_<T>(value: T) -> Const<T> {
-    Const(value)
-}
-
-impl<T> PropertyBase for Const<T> {
+impl<T> PropertyLike for Const<T> {
     type Value = T;
 }
 
@@ -123,128 +109,19 @@ impl<Env: ?Sized, T> Property<Env> for Const<T> {
     }
 }
 
-/// A [`Field`] which represents the environment itself.
-pub struct Identity<Env: ?Sized>(PhantomData<fn(Env) -> Env>);
+/// A [`Property`] wrapper over a constant reference.
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct ConstRef<'a, T: ?Sized>(pub &'a T);
 
-impl<Env: ?Sized> Identity<Env> {
-    /// Constructs a new [`Identity`].
-    pub fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<Env: ?Sized> Default for Identity<Env> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<Env: ?Sized> Copy for Identity<Env> {}
-
-impl<Env: ?Sized> Clone for Identity<Env> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<Env: ?Sized> PropertyBase for Identity<Env> {
-    type Value = Env;
-}
-
-impl<Env: ?Sized> Property<Env> for Identity<Env> {
-    fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Env) -> R) -> R {
-        inner(env)
-    }
-}
-
-impl<Env: ?Sized> Field<Env> for Identity<Env> {
-    fn with_mut<R>(&self, env: &mut Env, inner: impl FnOnce(&mut Env) -> R) -> R {
-        inner(env)
-    }
-}
-
-/// A [`Property`] which "selects" a sub-field of a source [`Property`].
-pub struct SelectProperty<P, F> {
-    source: P,
-    select: F,
-}
-
-impl<P: PropertyBase, F: Fn(&P::Value) -> &T, T> PropertyBase for SelectProperty<P, F> {
+impl<T: ?Sized> PropertyLike for ConstRef<'_, T> {
     type Value = T;
 }
 
-impl<Env: ?Sized, P: Property<Env>, F: Fn(&P::Value) -> &T, T> Property<Env>
-    for SelectProperty<P, F>
-{
-    fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&T) -> R) -> R {
-        self.source
-            .with_ref(env, |source| inner((self.select)(source)))
+impl<Env: ?Sized, T: ?Sized> Property<Env> for ConstRef<'_, T> {
+    fn with_ref<R>(&self, _: &Env, inner: impl FnOnce(&T) -> R) -> R {
+        inner(self.0)
     }
-}
-
-/// A [`Field`] implemented using a pair of closures.
-pub struct FnField<P, GetRef, GetMut> {
-    parent: P,
-    get_ref: GetRef,
-    get_mut: GetMut,
-}
-
-impl<P: PropertyBase, GetRef: Fn(&P::Value) -> &T, GetMut: Fn(&mut P::Value) -> &mut T, T>
-    FnField<P, GetRef, GetMut>
-{
-    /// Constructs a new [`FnField`].
-    pub fn new(parent: P, get_ref: GetRef, get_mut: GetMut) -> Self {
-        Self {
-            parent,
-            get_ref,
-            get_mut,
-        }
-    }
-}
-
-impl<P: PropertyBase, GetRef: Fn(&P::Value) -> &T, GetMut: Fn(&mut P::Value) -> &mut T, T>
-    PropertyBase for FnField<P, GetRef, GetMut>
-{
-    type Value = T;
-}
-
-impl<
-        Env: ?Sized,
-        P: Property<Env>,
-        GetRef: Fn(&P::Value) -> &T,
-        GetMut: Fn(&mut P::Value) -> &mut T,
-        T,
-    > Property<Env> for FnField<P, GetRef, GetMut>
-{
-    fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&Self::Value) -> R) -> R {
-        let parent = &self.parent;
-        parent.with_ref(env, |parent| inner((self.get_ref)(parent)))
-    }
-}
-
-impl<
-        Env: ?Sized,
-        P: Field<Env>,
-        GetRef: Fn(&P::Value) -> &T,
-        GetMut: Fn(&mut P::Value) -> &mut T,
-        T,
-    > Field<Env> for FnField<P, GetRef, GetMut>
-{
-    fn with_mut<R>(&self, env: &mut Env, inner: impl FnOnce(&mut Self::Value) -> R) -> R {
-        let parent = &self.parent;
-        parent.with_mut(env, |parent| inner((self.get_mut)(parent)))
-    }
-}
-
-#[macro_export]
-macro_rules! field {
-    ($head:tt $($tail:tt)*) => {
-        $crate::ui::FnField::new(
-            $head,
-            |parent: &_| & parent $($tail)*,
-            |parent: &mut _| &mut parent $($tail)*,
-        )
-    };
 }
 
 /// A [`Property`] of an unspecified type, determined at runtime.
@@ -300,7 +177,7 @@ impl<Env: ?Sized, T: ?Sized, P: Property<Env, Value = T>> PropertySafe<Env, T> f
     }
 }
 
-impl<Env: ?Sized, T: ?Sized> PropertyBase for DynProperty<'_, Env, T> {
+impl<Env: ?Sized, T: ?Sized> PropertyLike for DynProperty<'_, Env, T> {
     type Value = T;
 }
 

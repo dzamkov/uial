@@ -115,7 +115,7 @@ fn test_camera_update() {
 /// which is drawn using a custom closure.
 pub struct ZoomCanvas<
     Env: WidgetEnvironment + ?Sized,
-    C: PropertyBase<Value = Camera>,
+    C: PropertyLike<Value = Camera>,
     F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
 > {
     _marker: PhantomData<fn(&Env)>,
@@ -154,7 +154,7 @@ pub fn zoom_canvas<
 
 impl<
     Env: WidgetEnvironment + ?Sized,
-    C: PropertyBase<Value = Camera>,
+    C: PropertyLike<Value = Camera>,
     F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
 > WidgetLike for ZoomCanvas<Env, C, F>
 {
@@ -193,7 +193,7 @@ impl<
 pub struct ZoomCanvasPlaced<
     'a,
     Env: WidgetEnvironment + ?Sized,
-    C: PropertyBase<Value = Camera>,
+    C: PropertyLike<Value = Camera>,
     F: Fn(&Env, &mut Transform<Similarity2, &mut Env::Drawer>),
     Slot,
 > {

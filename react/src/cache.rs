@@ -1,4 +1,4 @@
-use crate::{Property, PropertyBase};
+use crate::{Property, PropertyLike};
 use std::cell::Cell;
 
 /// An object which tracks "observations" and changes made to it. This is useful for caching,
@@ -87,7 +87,7 @@ pub struct CacheProperty<Env: Track + ?Sized, F: Fn(&Env, Option<T>) -> T, T> {
     compute: F,
 }
 
-impl<Env: Track + ?Sized, F: Fn(&Env, Option<T>) -> T, T> PropertyBase
+impl<Env: Track + ?Sized, F: Fn(&Env, Option<T>) -> T, T> PropertyLike
     for CacheProperty<Env, F, T>
 {
     type Value = T;

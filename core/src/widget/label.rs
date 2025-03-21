@@ -9,29 +9,32 @@ use std::any::Any;
 /// fit the text.
 pub struct Label<
     Env: WidgetEnvironment + Track + ?Sized,
-    F: Property<Env>,
-    T: Property<Env, Value = String>,
+    PFont: Property<Env>,
+    PText: Property<Env, Value = str>,
 > where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
-    font: F,
+    font: PFont,
     dir: Dir2i,
-    text: T,
+    text: PText,
     #[allow(clippy::type_complexity)]
-    text_buffer_cache: Cache<Env, (Size2i, TextBuffer<<F::Value as FontBase>::Glyph>)>,
+    text_buffer_cache: Cache<Env, (Size2i, TextBuffer<<PFont::Value as FontBase>::Glyph>)>,
 }
 
-impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
-    Label<Env, F, T>
+impl<
+    Env: WidgetEnvironment + Track + ?Sized,
+    PFont: Property<Env>,
+    PText: Property<Env, Value = str>,
+> Label<Env, PFont, PText>
 where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
     /// Constructs a new [`Label`] widget.
-    pub fn new(font: F, text: T) -> Self {
+    pub fn new(font: PFont, text: PText) -> Self {
         Label {
             font,
             dir: Dir2i::Xp,
@@ -44,7 +47,7 @@ where
     fn with_text_buffer<R>(
         &self,
         env: &Env,
-        f: impl FnOnce(Size2i, &TextBuffer<<F::Value as FontBase>::Glyph>) -> R,
+        f: impl FnOnce(Size2i, &TextBuffer<<PFont::Value as FontBase>::Glyph>) -> R,
     ) -> R {
         self.text_buffer_cache.with(
             env,
@@ -79,50 +82,50 @@ where
 pub fn label<
     Env: WidgetEnvironment + Track + ?Sized,
     F: Font<Env::Drawer>,
-    T: Property<Env, Value = String>,
+    PText: Property<Env, Value = str>,
 >(
     font: F,
-    text: T,
-) -> Label<Env, Const<F>, T>
+    text: PText,
+) -> Label<Env, Const<F>, PText>
 where
     Env::Drawer: RasterDrawer,
     F::Glyph: Sized,
 {
     Label {
-        font: const_(font),
+        font: Const(font),
         dir: Dir2i::Xp,
         text,
         text_buffer_cache: Cache::new(),
     }
 }
 
-impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
-    WidgetLike for Label<Env, F, T>
+impl<Env: WidgetEnvironment + Track + ?Sized, PFont: Property<Env>, PText: Property<Env, Value = str>>
+    WidgetLike for Label<Env, PFont, PText>
 where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
 }
 
-impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
-    IntoWidget<Env> for Label<Env, F, T>
+impl<Env: WidgetEnvironment + Track + ?Sized, PFont: Property<Env>, PText: Property<Env, Value = str>>
+    IntoWidget<Env> for Label<Env, PFont, PText>
 where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
     fn into_widget(self, _: &Env) -> impl Widget<Env> {
         self
     }
 }
 
-impl<Env: WidgetEnvironment + Track + ?Sized, F: Property<Env>, T: Property<Env, Value = String>>
-    Widget<Env> for Label<Env, F, T>
+impl<Env: WidgetEnvironment + Track + ?Sized, PFont: Property<Env>, PText: Property<Env, Value = str>>
+    Widget<Env> for Label<Env, PFont, PText>
 where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
     fn sizing(&self, env: &Env) -> Sizing {
         self.with_text_buffer(env, |size, _| Sizing::exact(size))
@@ -140,28 +143,28 @@ where
 struct LabelPlaced<
     'a,
     Env: WidgetEnvironment + Track + ?Sized,
-    F: Property<Env>,
-    T: Property<Env, Value = String>,
+    PFont: Property<Env>,
+    PText: Property<Env, Value = str>,
     Slot,
 > where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
-    widget: &'a Label<Env, F, T>,
+    widget: &'a Label<Env, PFont, PText>,
     slot: Slot,
 }
 
 impl<
     Env: WidgetEnvironment + Track + ?Sized,
-    F: Property<Env>,
-    T: Property<Env, Value = String>,
+    PFont: Property<Env>,
+    PText: Property<Env, Value = str>,
     Slot: WidgetSlot<Env>,
-> WidgetPlaced<Env> for LabelPlaced<'_, Env, F, T, Slot>
+> WidgetPlaced<Env> for LabelPlaced<'_, Env, PFont, PText, Slot>
 where
     Env::Drawer: RasterDrawer,
-    F::Value: Font<Env::Drawer>,
-    <F::Value as FontBase>::Glyph: Sized,
+    PFont::Value: Font<Env::Drawer>,
+    <PFont::Value as FontBase>::Glyph: Sized,
 {
     fn draw(&self, env: &Env, drawer: &mut Env::Drawer) {
         let offset = self.slot.min(env);

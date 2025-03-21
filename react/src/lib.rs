@@ -60,7 +60,7 @@ impl<R: React + ?Sized, T> ReactCell<R, T> {
     }
 }
 
-impl<R: React + ?Sized, T> PropertyBase for ReactCell<R, T> {
+impl<R: React + ?Sized, T> PropertyLike for ReactCell<R, T> {
     type Value = T;
 }
 

@@ -20,7 +20,7 @@ pub trait ButtonStyle<Env: WidgetEnvironment + ?Sized> {
 /// A widget style which defines a "text button" widget.
 pub trait TextButtonStyle<Env: WidgetEnvironment + ?Sized> {
     /// Constructs a button with the given text.
-    fn text_button(&self, text: impl Property<Env, Value = String>) -> impl IntoButtonWidget<Env>;
+    fn text_button(&self, text: impl Property<Env, Value = str>) -> impl IntoButtonWidget<Env>;
 }
 
 /// A [`WidgetLike`] representing a clickable button.
@@ -54,11 +54,11 @@ pub fn button<
 pub fn text_button<
     Env: WidgetEnvironment + ?Sized + 'static,
     Style: TextButtonStyle<Env> + 'static,
-    Text: Property<Env, Value = String>,
+    PText: Property<Env, Value = str>,
 >(
     style: &Style,
-    text: Text,
-) -> impl IntoButtonWidget<Env> + use<Env, Style, Text> {
+    text: PText,
+) -> impl IntoButtonWidget<Env> + use<Env, Style, PText> {
     // TODO: This is a hack to work around https://github.com/rust-lang/rust/issues/130044
     // once this is stablized, we can remove this and the `'static` bounds
     let style: &'static Style = unsafe { std::mem::transmute(style) };

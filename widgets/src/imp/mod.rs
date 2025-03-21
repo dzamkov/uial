@@ -51,7 +51,7 @@ impl<Env: RunEnvironment + ?Sized> crate::ButtonStyle<Env> for RunCommonStyle<En
 impl<Env: RunEnvironment + ?Sized> crate::TextButtonStyle<Env> for RunCommonStyle<Env> {
     fn text_button(
         &self,
-        text: impl Property<Env, Value = String>,
+        text: impl Property<Env, Value = str>,
     ) -> impl crate::IntoButtonWidget<Env> {
         crate::TextButtonStyle::text_button(&self.button, text)
     }

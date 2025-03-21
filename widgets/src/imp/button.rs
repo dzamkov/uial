@@ -39,7 +39,7 @@ impl<Env: RunEnvironment + ?Sized> crate::ButtonStyle<Env>
     fn button(&self, content: impl IntoWidget<Env>) -> impl crate::IntoButtonWidget<Env> {
         ButtonBuilder {
             def: (self.clone(), content),
-            is_enabled: const_(true),
+            is_enabled: Const(true),
             on_click: on_click_default,
         }
     }
@@ -50,11 +50,11 @@ impl<Env: RunEnvironment + ?Sized> crate::TextButtonStyle<Env>
 {
     fn text_button(
         &self,
-        text: impl Property<Env, Value = String>,
+        text: impl Property<Env, Value = str>,
     ) -> impl crate::IntoButtonWidget<Env> {
         ButtonBuilder {
             def: (self, text),
-            is_enabled: const_(true),
+            is_enabled: Const(true),
             on_click: on_click_default,
         }
     }
@@ -64,20 +64,20 @@ impl<Env: RunEnvironment + ?Sized> crate::TextButtonStyle<Env>
 fn on_click_default<Env: WidgetEnvironment + ?Sized>(_: &mut Env) {}
 
 /// A builder for constructing [`Button`]s.
-struct ButtonBuilder<Def, Enabled, OnClick> {
+struct ButtonBuilder<Def, PEnabled, OnClick> {
     def: Def,
-    is_enabled: Enabled,
+    is_enabled: PEnabled,
     on_click: OnClick,
 }
 
-impl<Def, Enabled, OnClick> WidgetLike for ButtonBuilder<Def, Enabled, OnClick> {}
+impl<Def, PEnabled, OnClick> WidgetLike for ButtonBuilder<Def, PEnabled, OnClick> {}
 
 impl<
     Env: RunEnvironment + ?Sized,
     Def: ButtonDefinition<Env>,
-    Enabled: Property<Env, Value = bool> + Clone,
+    PEnabled: Property<Env, Value = bool> + Clone,
     OnClick: Fn(&mut Env),
-> crate::IntoButtonWidget<Env> for ButtonBuilder<Def, Enabled, OnClick>
+> crate::IntoButtonWidget<Env> for ButtonBuilder<Def, PEnabled, OnClick>
 {
     fn set_enabled(
         self,
@@ -102,9 +102,9 @@ impl<
 impl<
     Env: WidgetEnvironment + ?Sized,
     Def: ButtonDefinition<Env>,
-    Enabled: Property<Env, Value = bool> + Clone,
+    PEnabled: Property<Env, Value = bool> + Clone,
     OnClick: Fn(&mut Env),
-> IntoWidget<Env> for ButtonBuilder<Def, Enabled, OnClick>
+> IntoWidget<Env> for ButtonBuilder<Def, PEnabled, OnClick>
 {
     fn into_widget(self, env: &Env) -> impl Widget<Env> {
         Def::into_widget(self, env)
@@ -114,8 +114,8 @@ impl<
 /// Encapsulates the content and style of a [`Button`].
 trait ButtonDefinition<Env: WidgetEnvironment + ?Sized>: Sized {
     /// Constructs a [`Widget`] from a builder using this definition.
-    fn into_widget<Enabled: Property<Env, Value = bool> + Clone, OnClick: Fn(&mut Env)>(
-        builder: ButtonBuilder<Self, Enabled, OnClick>,
+    fn into_widget<PEnabled: Property<Env, Value = bool> + Clone, OnClick: Fn(&mut Env)>(
+        builder: ButtonBuilder<Self, PEnabled, OnClick>,
         env: &Env,
     ) -> impl Widget<Env>;
 }
@@ -123,8 +123,8 @@ trait ButtonDefinition<Env: WidgetEnvironment + ?Sized>: Sized {
 impl<Env: RunEnvironment + ?Sized, Content: IntoWidget<Env>> ButtonDefinition<Env>
     for (Rc<ButtonStyle<RunImageHandle<Env>>>, Content)
 {
-    fn into_widget<Enabled: Property<Env, Value = bool> + Clone, OnClick: Fn(&mut Env)>(
-        builder: ButtonBuilder<Self, Enabled, OnClick>,
+    fn into_widget<PEnabled: Property<Env, Value = bool> + Clone, OnClick: Fn(&mut Env)>(
+        builder: ButtonBuilder<Self, PEnabled, OnClick>,
         env: &Env,
     ) -> impl Widget<Env> {
         let (style, content) = builder.def;
@@ -135,11 +135,11 @@ impl<Env: RunEnvironment + ?Sized, Content: IntoWidget<Env>> ButtonDefinition<En
         ]
     }
 }
-impl<Env: RunEnvironment + ?Sized, Text: Property<Env, Value = String>> ButtonDefinition<Env>
-    for (&'_ TextButtonStyle<RunImageHandle<Env>, RunFont<Env>>, Text)
+impl<Env: RunEnvironment + ?Sized, PText: Property<Env, Value = str>> ButtonDefinition<Env>
+    for (&'_ TextButtonStyle<RunImageHandle<Env>, RunFont<Env>>, PText)
 {
-    fn into_widget<Enabled: Property<Env, Value = bool> + Clone, OnClick: Fn(&mut Env)>(
-        builder: ButtonBuilder<Self, Enabled, OnClick>,
+    fn into_widget<PEnabled: Property<Env, Value = bool> + Clone, OnClick: Fn(&mut Env)>(
+        builder: ButtonBuilder<Self, PEnabled, OnClick>,
         _: &Env,
     ) -> impl Widget<Env> {
         let (style, text) = builder.def;
@@ -153,8 +153,8 @@ impl<Env: RunEnvironment + ?Sized, Text: Property<Env, Value = String>> ButtonDe
             widget::Label::new(
                 SwitchProperty {
                     switch: builder.is_enabled,
-                    on_false: const_(style.disabled_font.clone()),
-                    on_true: const_(style.enabled_font.clone()),
+                    on_false: Const(style.disabled_font.clone()),
+                    on_true: Const(style.enabled_font.clone()),
                 },
                 text
             )
@@ -171,7 +171,7 @@ struct SwitchProperty<E, T> {
     on_true: T,
 }
 
-impl<E, T: PropertyBase> PropertyBase for SwitchProperty<E, T> {
+impl<E, T: PropertyLike> PropertyLike for SwitchProperty<E, T> {
     type Value = T::Value;
 }
 
@@ -188,10 +188,10 @@ impl<Env: ?Sized, E: Property<Env, Value = bool>, T: Property<Env>> Property<Env
 }
 
 /// A [`Widget`] which displays a clickable button (just the base, without any internal content).
-pub struct Button<Env: WidgetEnvironment + HasImageManager + ?Sized, Enabled, OnClick> {
+pub struct Button<Env: WidgetEnvironment + HasImageManager + ?Sized, PEnabled, OnClick> {
     id: WidgetId,
     style: Rc<ButtonStyle<RunImageHandle<Env>>>,
-    is_enabled: Enabled,
+    is_enabled: PEnabled,
     on_click: OnClick,
 }
 
@@ -204,13 +204,13 @@ pub enum ButtonState {
     Disabled,
 }
 
-impl<Env: WidgetEnvironment + HasImageManager + ?Sized, Enabled, OnClick>
-    Button<Env, Enabled, OnClick>
+impl<Env: WidgetEnvironment + HasImageManager + ?Sized, PEnabled, OnClick>
+    Button<Env, PEnabled, OnClick>
 {
     /// Creates a new [`Button`] with the given properties.
     pub fn new(
         style: Rc<ButtonStyle<RunImageHandle<Env>>>,
-        is_enabled: Enabled,
+        is_enabled: PEnabled,
         on_click: OnClick,
     ) -> Self {
         Self {
@@ -222,9 +222,9 @@ impl<Env: WidgetEnvironment + HasImageManager + ?Sized, Enabled, OnClick>
     }
 
     /// Returns a [`Property`] which represents the [`ButtonState`] of this [`Button`].
-    pub fn state(&self) -> ButtonStateProperty<Enabled>
+    pub fn state(&self) -> ButtonStateProperty<PEnabled>
     where
-        Enabled: Clone,
+        PEnabled: Clone,
     {
         ButtonStateProperty {
             is_enabled: self.is_enabled.clone(),
@@ -234,17 +234,17 @@ impl<Env: WidgetEnvironment + HasImageManager + ?Sized, Enabled, OnClick>
 }
 
 /// A [`Property`] which represents the [`ButtonState`] of an [`Button`].
-pub struct ButtonStateProperty<Enabled> {
-    is_enabled: Enabled,
+pub struct ButtonStateProperty<PEnabled> {
+    is_enabled: PEnabled,
     widget: WidgetId,
 }
 
-impl<Enabled> PropertyBase for ButtonStateProperty<Enabled> {
+impl<PEnabled> PropertyLike for ButtonStateProperty<PEnabled> {
     type Value = ButtonState;
 }
 
-impl<Env: WidgetEnvironment + ?Sized, Enabled: Property<Env, Value = bool>> Property<Env>
-    for ButtonStateProperty<Enabled>
+impl<Env: WidgetEnvironment + ?Sized, PEnabled: Property<Env, Value = bool>> Property<Env>
+    for ButtonStateProperty<PEnabled>
 {
     fn with_ref<R>(&self, env: &Env, inner: impl FnOnce(&ButtonState) -> R) -> R {
         inner(&self.get(env))
@@ -271,13 +271,13 @@ impl<Env: WidgetEnvironment + ?Sized, Enabled: Property<Env, Value = bool>> Prop
     }
 }
 
-impl<Env: RunEnvironment + ?Sized, Enabled, OnClick> WidgetLike for Button<Env, Enabled, OnClick> {}
+impl<Env: RunEnvironment + ?Sized, PEnabled, OnClick> WidgetLike for Button<Env, PEnabled, OnClick> {}
 
 impl<
     Env: RunEnvironment + ?Sized,
-    Enabled: Property<Env, Value = bool> + Clone,
+    PEnabled: Property<Env, Value = bool> + Clone,
     OnClick: Fn(&mut Env),
-> IntoWidget<Env> for Button<Env, Enabled, OnClick>
+> IntoWidget<Env> for Button<Env, PEnabled, OnClick>
 {
     fn into_widget(self, _: &Env) -> impl Widget<Env> {
         self
@@ -286,9 +286,9 @@ impl<
 
 impl<
     Env: RunEnvironment + ?Sized,
-    Enabled: Property<Env, Value = bool> + Clone,
+    PEnabled: Property<Env, Value = bool> + Clone,
     OnClick: Fn(&mut Env),
-> Widget<Env> for Button<Env, Enabled, OnClick>
+> Widget<Env> for Button<Env, PEnabled, OnClick>
 {
     fn sizing(&self, _: &Env) -> Sizing {
         let mut min = size2i(1, 1);
@@ -386,8 +386,8 @@ impl<
     }
 }
 
-impl<'a, Env: RunEnvironment + ?Sized, Enabled, OnClick: Fn(&mut Env), Slot: WidgetSlot<Env>>
-    CursorInteractionHandler<'a, Env> for ButtonPlaced<'a, Env, Enabled, OnClick, Slot>
+impl<'a, Env: RunEnvironment + ?Sized, PEnabled, OnClick: Fn(&mut Env), Slot: WidgetSlot<Env>>
+    CursorInteractionHandler<'a, Env> for ButtonPlaced<'a, Env, PEnabled, OnClick, Slot>
 {
     fn is_locked(&self, _: &Env) -> bool {
         false

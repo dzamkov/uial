@@ -101,12 +101,12 @@ impl<T: WidgetLike> RestrictWidgetExt for T {}
 
 /// A wrapper over a [`Widget`] which restricts the possible sizes it can be instantiated with.
 #[derive(Clone, Copy)]
-pub struct Restrict<T: WidgetLike, S: PropertyBase<Value = Sizing>> {
+pub struct Restrict<T: WidgetLike, S: PropertyLike<Value = Sizing>> {
     inner: T,
     sizing: S,
 }
 
-impl<T: WidgetLike, S: PropertyBase<Value = Sizing>> Restrict<T, S> {
+impl<T: WidgetLike, S: PropertyLike<Value = Sizing>> Restrict<T, S> {
     /// Constructs a new [`Restrict`] widget.
     pub fn new(inner: T, sizing: S) -> Self {
         Self { inner, sizing }
@@ -210,7 +210,7 @@ impl<T: WidgetLike> Restrict<T, Const<Sizing>> {
     }
 }
 
-impl<T: WidgetLike, S: PropertyBase<Value = Sizing>> WidgetLike for Restrict<T, S> {}
+impl<T: WidgetLike, S: PropertyLike<Value = Sizing>> WidgetLike for Restrict<T, S> {}
 
 impl<Env: WidgetEnvironment + ?Sized, T: IntoWidget<Env>, S: Property<Env, Value = Sizing>>
     IntoWidget<Env> for Restrict<T, S>

@@ -5,7 +5,7 @@ use std::mem::ManuallyDrop;
 use std::rc::Rc;
 
 /// Contains [`Switch`]-related extension methods for [`Property`]s.
-pub trait SwitchWidgetExt<T: WidgetLike + ?Sized>: PropertyBase<Value = Rc<T>> + Sized {
+pub trait SwitchWidgetExt<T: WidgetLike + ?Sized>: PropertyLike<Value = Rc<T>> + Sized {
     /// Constructs a [`Widget`] which reflects the layout and appearance of the [`Widget`] inside
     /// this property.
     fn switch(self) -> Switch<Self, T> {
@@ -13,13 +13,13 @@ pub trait SwitchWidgetExt<T: WidgetLike + ?Sized>: PropertyBase<Value = Rc<T>> +
     }
 }
 
-impl<P: PropertyBase<Value = Rc<T>>, T: WidgetLike + ?Sized> SwitchWidgetExt<T> for P {}
+impl<P: PropertyLike<Value = Rc<T>>, T: WidgetLike + ?Sized> SwitchWidgetExt<T> for P {}
 
 /// A [`Widget`] defined by a [`Property`] which produces a widget. When the value of the property
 /// changes, the widget will completely change its layout and appearance to reflect the new value.
-pub struct Switch<P: PropertyBase<Value = Rc<T>>, T: WidgetLike + ?Sized>(P);
+pub struct Switch<P: PropertyLike<Value = Rc<T>>, T: WidgetLike + ?Sized>(P);
 
-impl<P: PropertyBase<Value = Rc<T>>, T: WidgetLike + ?Sized> WidgetLike for Switch<P, T> {}
+impl<P: PropertyLike<Value = Rc<T>>, T: WidgetLike + ?Sized> WidgetLike for Switch<P, T> {}
 
 impl<P: Property<Env, Value = Rc<T>>, T: Widget<Env> + ?Sized, Env: WidgetEnvironment + ?Sized>
     IntoWidget<Env> for Switch<P, T>

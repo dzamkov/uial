@@ -1,6 +1,6 @@
 pub use crate::geometry::{Duration, Instant};
 use std::cell::Cell;
-use uial_react::{Field, Property, PropertyBase, Track};
+use uial_react::{Field, Property, PropertyLike, Track};
 
 /// An "environment" which provides an absolute time reference.
 pub trait HasClock {
@@ -114,7 +114,7 @@ impl<T: Update + Clone> Trajectory<T> {
 /// the environment's clock time (see [`HasClock`]).
 pub struct Current<S>(S);
 
-impl<S: PropertyBase<Value = Trajectory<T>>, T: Update> PropertyBase for Current<S> {
+impl<S: PropertyLike<Value = Trajectory<T>>, T: Update> PropertyLike for Current<S> {
     type Value = T;
 }
 
@@ -141,8 +141,8 @@ impl<Env: ?Sized + HasClock, S: Field<Env, Value = Trajectory<T>>, T: Update + C
     }
 }
 
-/// Contains [`Current`]-related extension methods for [`PropertyBase`].
-pub trait CurrentExt: Sized + PropertyBase {
+/// Contains [`Current`]-related extension methods for [`PropertyLike`].
+pub trait CurrentExt: Sized + PropertyLike {
     /// Gets the "current" value of this [`Trajectory`] field or property according to the
     /// environment's clock time (see [`HasClock`]).
     fn current(self) -> Current<Self> {
@@ -150,4 +150,4 @@ pub trait CurrentExt: Sized + PropertyBase {
     }
 }
 
-impl<S: PropertyBase<Value = Trajectory<T>>, T: Update> CurrentExt for S {}
+impl<S: PropertyLike<Value = Trajectory<T>>, T: Update> CurrentExt for S {}
