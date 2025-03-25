@@ -34,6 +34,11 @@ impl RenegeReact<'_> {
         validity &= token;
         self.validity.set(validity);
     }
+
+    /// Gets the [`Cell`] which defines the validity of the current computation.
+    pub fn validity(&self) -> &Cell<renege::Token> {
+        &self.validity
+    }
 }
 
 impl<'brand> React for RenegeReact<'brand> {
