@@ -8,6 +8,7 @@ use uial::prelude::*;
 
 /// Manages the graphics context and windows that are used to display [`Widget`]s.
 pub struct Runner<'a, S: HasReact + Track> {
+    device_desc: &'a dyn Fn(&wgpu::Adapter) -> wgpu::DeviceDescriptor<'a>,
     wgpu: Option<WgpuEnvironment>,
     keys_held: ReactCell<S::React, BTreeSet<KeyCode>>,
     windows: HashMap<winit::window::WindowId, RunnerWindow<'a, S>>,
@@ -78,8 +79,12 @@ impl WgpuEnvironment {
 
 impl<'a, S: HasReact + Track> Runner<'a, S> {
     /// Creates a new [`Runner`].
-    pub fn new(state: &mut S) -> Self {
+    pub fn new(
+        device_desc: &'a dyn Fn(&wgpu::Adapter) -> wgpu::DeviceDescriptor<'a>,
+        state: &mut S,
+    ) -> Self {
         Self {
+            device_desc,
             wgpu: None,
             keys_held: state.react().new_cell(BTreeSet::new()),
             windows: HashMap::new(),
@@ -119,16 +124,9 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
                     })
                     .await
                     .expect("failed to find an appropriate adapter");
+                let device_desc = (self.device_desc)(&adapter);
                 let (device, queue) = adapter
-                    .request_device(
-                        &wgpu::DeviceDescriptor {
-                            label: None,
-                            required_features: wgpu::Features::empty(),
-                            required_limits: wgpu::Limits::default(),
-                            memory_hints: wgpu::MemoryHints::default(),
-                        },
-                        None,
-                    )
+                    .request_device(&device_desc, None)
                     .await
                     .expect("failed to create device");
                 let surface_capabilities = surface.get_capabilities(&adapter);
@@ -188,7 +186,8 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
 
         // Extend the lifetimes for references within the `RunnerWindow`
         let surface: wgpu::Surface<'static> = unsafe { std::mem::transmute(surface) };
-        let root_placed: Rc<dyn WidgetPlaced<RunEnv<S>>> = unsafe { std::mem::transmute(root_placed) };
+        let root_placed: Rc<dyn WidgetPlaced<RunEnv<S>>> =
+            unsafe { std::mem::transmute(root_placed) };
 
         // Add window to map
         Ok(&self

@@ -19,7 +19,8 @@ pub fn run<App: SimpleApplication<DefaultEnv>>(init: impl FnOnce(&mut DefaultSta
         Clock::new(Duration::ZERO),
     );
     let app = init(&mut state);
-    let runner = Runner::new(&mut state);
+    let device_desc = &|adapter: &::wgpu::Adapter| app.device_desc(adapter);
+    let runner = Runner::new(device_desc, &mut state);
     let mut handler = SimpleAppHandler {
         start_inst: std::time::Instant::now(),
         state,
@@ -42,6 +43,19 @@ pub trait SimpleApplication<Env: ?Sized + WidgetEnvironment> {
     fn update(&self, env: &mut Env, delta_time: Duration) {
         // Nothing done by default
         let _ = (env, delta_time);
+    }
+
+    /// Gets the [`::wgpu::DeviceDescriptor`] used to create the device for the application.
+    /// 
+    /// This method can be overridden to specify custom features and limits for applications
+    /// that require them.
+    fn device_desc(&self, _: &::wgpu::Adapter) -> ::wgpu::DeviceDescriptor {
+        ::wgpu::DeviceDescriptor {
+            label: None,
+            required_features: ::wgpu::Features::empty(),
+            required_limits: ::wgpu::Limits::default(),
+            memory_hints: ::wgpu::MemoryHints::default(),
+        }
     }
 }
 
