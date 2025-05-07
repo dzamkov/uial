@@ -126,7 +126,7 @@ impl<'a, S: HasReact + Track> Runner<'a, S> {
                     .expect("failed to find an appropriate adapter");
                 let device_desc = (self.device_desc)(&adapter);
                 let (device, queue) = adapter
-                    .request_device(&device_desc, None)
+                    .request_device(&device_desc)
                     .await
                     .expect("failed to create device");
                 let surface_capabilities = surface.get_capabilities(&adapter);
